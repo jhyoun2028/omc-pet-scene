@@ -20,17 +20,30 @@ const MODES = [
   { label: "/team",      count: 9 },
 ];
 
-const DEFAULT_TASKS = [
-  "refactoring auth...", "reviewing PR #42...", "fixing flaky test...",
-  "optimizing query...", "writing docs...",     "analyzing deps...",
-  "tracing bug...",      "checking types...",   "running lint...",
-  "deploying v2.1...",   "scanning vulns...",   "profiling render...",
-  "migrating schema...", "updating CI...",      "reading logs...",
-  "planning sprint...",  "auditing perms...",   "benchmarking...",
-];
+// Role-specific task templates — {f} is replaced with a real filename when available
+const AGENT_ROLE_TASKS = {
+  Autopilot:       ["orchestrating pipeline...", "routing {f}...", "delegating tasks...", "coordinating agents...", "sequencing plan..."],
+  Architect:       ["designing {f}...", "reviewing structure...", "planning modules...", "diagramming deps...", "evaluating tradeoffs..."],
+  Critic:          ["reviewing {f}...", "flagging issues...", "checking quality...", "auditing PR...", "rating complexity..."],
+  Librarian:       ["indexing {f}...", "fetching docs...", "searching refs...", "cataloging APIs...", "resolving imports..."],
+  Explorer:        ["scanning {f}...", "mapping codebase...", "tracing calls...", "finding usages...", "grepping symbols..."],
+  Oracle:          ["analyzing {f}...", "predicting impact...", "profiling perf...", "forecasting risk...", "evaluating deps..."],
+  "Risk Assessor": ["assessing {f}...", "checking vulns...", "auditing perms...", "scanning secrets...", "rating severity..."],
+  Worker:          ["editing {f}...", "implementing fix...", "writing code...", "refactoring fn...", "building feature..."],
+  Validator:       ["testing {f}...", "verifying output...", "running checks...", "validating types...", "confirming fix..."],
+};
 
-function getTaskPool() {
-  return (typeof window !== "undefined" && window.projectTasks) || DEFAULT_TASKS;
+function getRoleTask(agentName, index, tick) {
+  const pool = AGENT_ROLE_TASKS[agentName] || AGENT_ROLE_TASKS.Worker;
+  const template = pool[(Math.floor(tick / 50) + index) % pool.length];
+  // Replace {f} with a real project filename if available
+  const projectTasks = (typeof window !== "undefined" && window.projectTasks) || [];
+  const fileMatch = projectTasks.length > 0
+    ? projectTasks[(index + Math.floor(tick / 50)) % projectTasks.length]
+        .replace(/^(focused on |editing |saved |reviewing |changed |agent: |building |checking |scanning )/, "")
+        .replace(/\.\.\.$/, "")
+    : null;
+  return fileMatch ? template.replace("{f}", fileMatch) : template.replace(" {f}", "");
 }
 
 // ── Sparkle ───────────────────────────────────────────────────
@@ -446,12 +459,10 @@ function HUD({ mode, agentCount, tick, projectName }) {
 // ── Grid layout helpers ────────────────────────────────────────
 // Returns rows: [{deskY, mascotY, stations: [{cx, color}]}]
 function getLayout(agents) {
-  // Station width (how much horizontal space per agent)
   const SW = 72;
-  // Row 1 deskY (desk surface top), mascots sit just in front of desk
-  const ROW1_DESK_Y   = 58;    // desk surface
-  const ROW1_MASCOT_Y = 84;    // mascot top
-  const ROW2_DESK_Y   = 128;   // second row (only for 9-agent mode)
+  const ROW1_DESK_Y   = 58;
+  const ROW1_MASCOT_Y = 84;
+  const ROW2_DESK_Y   = 128;
   const ROW2_MASCOT_Y = 154;
 
   const count = agents.length;
@@ -462,11 +473,12 @@ function getLayout(agents) {
     const stations = agents.map((ag, i) => ({ cx: startX + i * SW, color: ag.color }));
     return [{ deskY: ROW1_DESK_Y, mascotY: ROW1_MASCOT_Y, stations, agentOffset: 0 }];
   } else {
-    // 9 agents: 5 top, 4 bottom
-    const top    = agents.slice(0, 5);
-    const bottom = agents.slice(5);
-    const topW   = top.length    * SW;
-    const botW   = bottom.length * SW;
+    // 6+ agents: split across two rows (top gets ceil, bottom gets rest)
+    const topCount = Math.min(5, Math.ceil(count / 2));
+    const top      = agents.slice(0, topCount);
+    const bottom   = agents.slice(topCount);
+    const topW     = top.length    * SW;
+    const botW     = bottom.length * SW;
     const topStartX  = (700 - topW)  / 2 + SW / 2;
     const botStartX  = (700 - botW)  / 2 + SW / 2;
     return [
@@ -478,7 +490,7 @@ function getLayout(agents) {
       {
         deskY: ROW2_DESK_Y, mascotY: ROW2_MASCOT_Y,
         stations: bottom.map((ag, i) => ({ cx: botStartX + i * SW, color: ag.color })),
-        agentOffset: 5,
+        agentOffset: topCount,
       },
     ];
   }
@@ -488,26 +500,43 @@ function getLayout(agents) {
 export default function OMCScene() {
   const [tick,        setTick]        = useState(0);
   const [modeIdx,     setModeIdx]     = useState(0);
+  const [agentCount,  setAgentCount]  = useState(null); // null = use mode count
   const [agentTasks,  setAgentTasks]  = useState({});
   const [sparkles,    setSparkles]    = useState([]);
   const [entryTicks,  setEntryTicks]  = useState({ 0: 0 });
   const [projectName, setProjectName] = useState("");
 
   const mode         = MODES[modeIdx];
-  const activeAgents = AGENTS.slice(0, mode.count);
+  // agentCount from extension overrides mode-based count
+  const effectiveCount = agentCount !== null ? agentCount : mode.count;
+  const activeAgents = AGENTS.slice(0, Math.min(effectiveCount, AGENTS.length));
 
-  // VS Code message listener — receives project info and auto-sets mode
+  // VS Code message listener — receives project info and auto-sets agent count
   useEffect(() => {
     function handleMessage(event) {
       const msg = event.data;
       if (msg.type === "projectTasks") window.projectTasks = msg.tasks;
       if (msg.type === "projectName")  setProjectName(msg.name);
+      if (msg.type === "setAgentCount" && typeof msg.count === "number") {
+        const newCount = Math.max(1, Math.min(msg.count, AGENTS.length));
+        const prevCount = effectiveCount;
+        setAgentCount(newCount);
+        if (newCount > prevCount) {
+          setEntryTicks((prev) => {
+            const next = { ...prev };
+            for (let i = prevCount; i < newCount; i++) next[i] = tick;
+            return next;
+          });
+        }
+      }
+      // Legacy mode support
       if (msg.type === "setMode" && typeof msg.modeIdx === "number") {
         const idx = Math.max(0, Math.min(msg.modeIdx, MODES.length - 1));
         if (idx !== modeIdx) {
-          const prevCount = MODES[modeIdx].count;
+          const prevCount = effectiveCount;
           const newCount = MODES[idx].count;
           setModeIdx(idx);
+          setAgentCount(null); // revert to mode-based
           if (newCount > prevCount) {
             setEntryTicks((prev) => {
               const next = { ...prev };
@@ -520,7 +549,7 @@ export default function OMCScene() {
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [modeIdx, tick]);
+  }, [modeIdx, tick, effectiveCount]);
 
   // Tick loop
   useEffect(() => {
@@ -528,13 +557,12 @@ export default function OMCScene() {
     return () => clearInterval(id);
   }, []);
 
-  // Rotate tasks
+  // Rotate tasks — each agent gets role-appropriate tasks
   useEffect(() => {
     if (tick % 50 === 0) {
-      const pool = getTaskPool();
       const next = {};
-      activeAgents.forEach((_, i) => {
-        next[i] = pool[Math.floor(Math.random() * pool.length)];
+      activeAgents.forEach((agent, i) => {
+        next[i] = getRoleTask(agent.name, i, tick);
       });
       setAgentTasks(next);
     }
@@ -560,9 +588,10 @@ export default function OMCScene() {
   }, [tick, activeAgents.length]);
 
   const switchMode = useCallback((idx) => {
-    const prevCount = MODES[modeIdx].count;
+    const prevCount = effectiveCount;
     const newCount  = MODES[idx].count;
     setModeIdx(idx);
+    setAgentCount(null); // revert to mode-based
     if (newCount > prevCount) {
       setEntryTicks(prev => {
         const next = { ...prev };
@@ -570,7 +599,7 @@ export default function OMCScene() {
         return next;
       });
     }
-  }, [modeIdx, tick]);
+  }, [effectiveCount, tick]);
 
   const rows = getLayout(activeAgents);
 
@@ -586,13 +615,12 @@ export default function OMCScene() {
 
         {/* No background — transparent overlay */}
 
-        {/* HUD hidden in overlay mode — uncomment for standalone */}
-        {/* <HUD
+        <HUD
           mode={mode.label}
           agentCount={activeAgents.length}
           tick={tick}
           projectName={projectName}
-        /> */}
+        />
 
         {/* Render each desk row */}
         {rows.map((row, ri) => (

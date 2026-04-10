@@ -60,16 +60,18 @@ function activate(context) {
     const editVelocity = recentEdits.length;
     const terminalCount = claudeTerminals.length;
 
-    let detected = 1;
-    if (terminalCount >= 4 || editVelocity >= 8) detected = 9;
-    else if (terminalCount >= 3 || editVelocity >= 5) detected = 5;
-    else if (terminalCount >= 2 || editVelocity >= 3) detected = 3;
+    // Base: 1 agent (autopilot always present)
+    // Each Claude terminal adds an agent; high edit velocity adds more
+    let detected = 1 + terminalCount;
+    if (editVelocity >= 8) detected = Math.max(detected, 6);
+    else if (editVelocity >= 5) detected = Math.max(detected, 4);
+    else if (editVelocity >= 3) detected = Math.max(detected, 2);
+    detected = Math.min(detected, 9); // cap at roster size
 
     if (detected !== agentCount) {
       agentCount = detected;
-      const modeMap = { 1: 0, 3: 1, 5: 2, 9: 3 };
       try {
-        webviewView.webview.postMessage({ type: "setMode", modeIdx: modeMap[agentCount] ?? 0 });
+        webviewView.webview.postMessage({ type: "setAgentCount", count: agentCount });
       } catch (e) {}
     }
   }
@@ -141,6 +143,12 @@ function activate(context) {
       if (name.includes("claude") || name.includes("agent")) {
         tasks.push(`agent: ${t.name}...`);
       }
+    }
+
+    // Include terminal names as task context
+    for (const t of vscode.window.terminals.slice(0, 6)) {
+      const name = (t.name || "").trim();
+      if (name) tasks.push(`running ${name}...`);
     }
 
     if (tasks.length < 4) {
