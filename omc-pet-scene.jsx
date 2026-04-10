@@ -2,497 +2,657 @@ import { useState, useEffect, useCallback } from "react";
 
 // ── Agent Roster ──────────────────────────────────────────────
 const AGENTS = [
-  { name: "Autopilot", color: "#E07045", accent: "#C45A32" },
-  { name: "Architect", color: "#4A7FBF", accent: "#3A6399" },
-  { name: "Critic", color: "#CF5050", accent: "#A33E3E" },
-  { name: "Librarian", color: "#5BA55B", accent: "#468946" },
-  { name: "Explorer", color: "#3BBFBF", accent: "#2E9999" },
-  { name: "Oracle", color: "#D4A843", accent: "#B8902E" },
-  { name: "Risk Assessor", color: "#9B6BBF", accent: "#7D54A0" },
-  { name: "Worker", color: "#8BC34A", accent: "#6FA030" },
-  { name: "Validator", color: "#00BCD4", accent: "#0097A7" },
+  { name: "Autopilot",     color: "#C47050", accent: "#A85A3C", light: "#D88868" },
+  { name: "Architect",     color: "#4A7FBF", accent: "#3A6399", light: "#6AA0DD" },
+  { name: "Critic",        color: "#CF5050", accent: "#A33E3E", light: "#E07070" },
+  { name: "Librarian",     color: "#5BA55B", accent: "#468946", light: "#7BC47B" },
+  { name: "Explorer",      color: "#3BBFBF", accent: "#2E9999", light: "#66D9D9" },
+  { name: "Oracle",        color: "#D4A843", accent: "#B8902E", light: "#E8C060" },
+  { name: "Risk Assessor", color: "#9B6BBF", accent: "#7D54A0", light: "#B88BD9" },
+  { name: "Worker",        color: "#8BC34A", accent: "#6FA030", light: "#A8DD66" },
+  { name: "Validator",     color: "#00BCD4", accent: "#0097A7", light: "#40D8E8" },
 ];
 
 const MODES = [
   { label: "/autopilot", count: 1 },
-  { label: "/deepwork", count: 3 },
+  { label: "/deepwork",  count: 3 },
   { label: "/ultrawork", count: 5 },
-  { label: "/team", count: 9 },
+  { label: "/team",      count: 9 },
 ];
 
-const TASKS_POOL = [
-  "refactoring auth...",
-  "reviewing PR #42...",
-  "fixing flaky test...",
-  "optimizing query...",
-  "writing docs...",
-  "analyzing deps...",
-  "tracing bug...",
-  "checking types...",
-  "running lint...",
-  "deploying v2.1...",
-  "scanning vulns...",
-  "profiling render...",
-  "migrating schema...",
-  "updating CI...",
-  "reading logs...",
-  "planning sprint...",
-  "auditing perms...",
-  "benchmarking...",
+const DEFAULT_TASKS = [
+  "refactoring auth...", "reviewing PR #42...", "fixing flaky test...",
+  "optimizing query...", "writing docs...",     "analyzing deps...",
+  "tracing bug...",      "checking types...",   "running lint...",
+  "deploying v2.1...",   "scanning vulns...",   "profiling render...",
+  "migrating schema...", "updating CI...",      "reading logs...",
+  "planning sprint...",  "auditing perms...",   "benchmarking...",
 ];
+
+function getTaskPool() {
+  return (typeof window !== "undefined" && window.projectTasks) || DEFAULT_TASKS;
+}
 
 // ── Sparkle ───────────────────────────────────────────────────
 function Sparkle({ x, y, age, color }) {
-  const opacity = Math.max(0, 1 - age / 30);
-  const dy = -age * 1.2;
-  const size = 3 + Math.sin(age * 0.5) * 1.5;
+  const opacity = Math.max(0, 1 - age / 22);
+  const dy = -age * 1.4;
+  const dx = Math.sin(age * 0.45) * 4;
+  const s = 1.5 + Math.sin(age * 0.7) * 0.8;
   return (
-    <rect
-      x={x - size / 2}
-      y={y + dy - size / 2}
-      width={size}
-      height={size}
-      fill={color}
-      opacity={opacity}
-      transform={`rotate(45 ${x} ${y + dy})`}
-    />
-  );
-}
-
-// ── Monitor ───────────────────────────────────────────────────
-function Monitor({ x, y, color, tick }) {
-  const lines = [0, 1, 2, 3, 4];
-  return (
-    <g>
-      {/* Screen frame */}
-      <rect x={x} y={y} width={28} height={20} fill="#1a1a2e" rx={1} />
-      <rect x={x + 1} y={y + 1} width={26} height={18} fill="#0d0d1a" rx={1} />
-      {/* Stand */}
-      <rect x={x + 11} y={y + 20} width={6} height={4} fill="#2a2a3e" />
-      <rect x={x + 8} y={y + 24} width={12} height={2} fill="#2a2a3e" />
-      {/* Scrolling code lines */}
-      {lines.map((i) => {
-        const lineY = y + 3 + i * 3.5;
-        const offset = ((tick * 0.5 + i * 7) % 20);
-        const w = 6 + ((i * 13 + tick) % 12);
-        return (
-          <rect
-            key={i}
-            x={x + 3 + offset * 0.3}
-            y={lineY}
-            width={Math.min(w, 22)}
-            height={1.5}
-            fill={color}
-            opacity={0.4 + Math.sin(tick * 0.1 + i) * 0.2}
-            rx={0.5}
-          />
-        );
-      })}
-      {/* Screen glow */}
+    <g opacity={opacity}>
       <rect
-        x={x + 1}
-        y={y + 1}
-        width={26}
-        height={18}
+        x={x + dx - s / 2} y={y + dy - s / 2}
+        width={s} height={s}
         fill={color}
-        opacity={tick % 60 < 2 ? 0.15 : 0.03}
-        rx={1}
+        transform={`rotate(45 ${x + dx} ${y + dy})`}
       />
     </g>
   );
 }
 
-// ── Coffee Mug ────────────────────────────────────────────────
-function CoffeeMug({ x, y, tick }) {
+// (compact mode — no stars)
+
+// ── Office Background ─────────────────────────────────────────
+function OfficeBackground() {
+  // Transparent — no background rects. Mascots float over your workspace.
+  return null;
+}
+
+// ── Desk Row (front-facing shared desk) ──────────────────────
+// Renders the desk surface and monitor backs BEHIND the mascots.
+// rowY = vertical center of the row (where mascots stand).
+// stations = array of {x, color} for each workstation center.
+function DeskRow({ stations, deskY, tick }) {
+  if (!stations.length) return null;
+  const leftX  = stations[0].cx - 28;
+  const rightX = stations[stations.length - 1].cx + 28;
+  const deskW  = rightX - leftX;
+
   return (
     <g>
-      {/* Mug body */}
-      <rect x={x} y={y} width={12} height={14} fill="#e8e0d4" rx={1} />
-      {/* Coffee fill */}
-      <rect x={x + 1} y={y + 3} width={10} height={10} fill="#5c3a1e" rx={1} />
-      {/* Handle */}
-      <rect x={x + 12} y={y + 3} width={4} height={3} fill="#e8e0d4" />
-      <rect x={x + 14} y={y + 3} width={2} height={8} fill="#e8e0d4" />
-      <rect x={x + 12} y={y + 9} width={4} height={3} fill="#e8e0d4" />
-      {/* Steam */}
-      {[0, 1, 2].map((i) => {
-        const sy = y - 4 - Math.sin(tick * 0.12 + i * 2) * 3;
-        const sx = x + 3 + i * 3;
+      {/* ── Desk tabletop (back edge) ── */}
+      <rect x={leftX - 2} y={deskY - 2} width={deskW + 4} height={2} fill="#6a4030" opacity={0.6} />
+      {/* Desk surface */}
+      <rect x={leftX} y={deskY} width={deskW} height={10} fill="#4a3020" />
+      {/* Surface highlight */}
+      <rect x={leftX} y={deskY} width={deskW} height={2}  fill="#5c3c28" />
+      {/* Desk front face */}
+      <rect x={leftX} y={deskY + 10} width={deskW} height={14} fill="#3a2418" />
+      {/* Desk front highlight */}
+      <rect x={leftX} y={deskY + 10} width={deskW} height={1} fill="#4a2e1e" />
+      {/* Desk legs */}
+      {[leftX + 4, rightX - 8].map((lx, li) => (
+        <g key={`leg${li}`}>
+          <rect x={lx} y={deskY + 24} width={4} height={28} fill="#2a1a10" />
+          {/* Foot */}
+          <rect x={lx - 2} y={deskY + 50} width={8} height={2} fill="#1e1410" />
+        </g>
+      ))}
+
+      {/* ── Per-station items on desk ── */}
+      {stations.map((st, si) => {
+        // Monitor back (we see back of monitor since screen faces the mascot)
+        const mx = st.cx - 12;
+        const my = deskY - 22;
+        // Screen glow (top edge of monitor — slight color bleed from screen)
+        const glowOpacity = 0.12 + Math.sin(tick * 0.09 + si * 1.3) * 0.05;
         return (
-          <rect
-            key={i}
-            x={sx}
-            y={sy}
-            width={2}
-            height={2}
-            fill="#8888aa"
-            opacity={0.3 + Math.sin(tick * 0.08 + i) * 0.15}
-          />
+          <g key={`station${si}`}>
+            {/* Monitor frame (screen faces us) */}
+            <rect x={mx}     y={my}      width={24} height={18} fill="#1e1e38" rx={1} />
+            {/* Screen */}
+            <rect x={mx + 2} y={my + 2}  width={20} height={13} fill="#0a0a16" />
+            {/* Scrolling code lines on screen */}
+            {[0, 1, 2, 3].map((li) => (
+              <rect key={`l${li}`}
+                x={mx + 4 + ((tick * 0.3 + li * 4) % 5)}
+                y={my + 4 + li * 3}
+                width={4 + ((li * 11 + tick) % 10)}
+                height={1.5}
+                fill={st.color}
+                opacity={0.3 + Math.sin(tick * 0.1 + li + si) * 0.15} />
+            ))}
+            {/* Cursor blink */}
+            {tick % 10 < 5 && (
+              <rect x={mx + 4} y={my + 4 + ((tick >> 2) % 4) * 3}
+                width={1.5} height={1.5} fill="#fff" opacity={0.5} />
+            )}
+            {/* Screen glow */}
+            <rect x={mx + 2} y={my + 2} width={20} height={13}
+              fill={st.color} opacity={glowOpacity * 0.5} />
+            {/* Power LED */}
+            <rect x={mx + 11} y={my + 16} width={2} height={1} fill="#5BA55B" opacity={0.5} />
+            {/* Monitor stand */}
+            <rect x={mx + 9} y={my + 18} width={6}  height={4}  fill="#222240" />
+            <rect x={mx + 5} y={my + 22} width={14} height={2}  fill="#282848" />
+            {/* Keyboard on desk */}
+            <rect x={mx + 1} y={deskY + 3} width={22} height={5} fill="#141428" rx={1} />
+            <rect x={mx + 2} y={deskY + 4} width={20} height={3} fill="#1c1c38" rx={1} />
+            {/* Key dots */}
+            {[0,1,2,3,4].map(ki => (
+              <rect key={ki} x={mx + 3 + ki * 3.8} y={deskY + 5}
+                width={2.5} height={1.5} fill="#242444" opacity={0.8} />
+            ))}
+            {/* Small item: mug every other station, rubber duck on alternates */}
+            {si % 3 === 0 && (
+              <g>
+                {/* Coffee mug */}
+                <rect x={mx + 26} y={deskY + 1} width={8}  height={8}  fill="#d8d0c4" />
+                <rect x={mx + 27} y={deskY + 2} width={6}  height={6}  fill="#4a2e10" />
+                <rect x={mx + 34} y={deskY + 3} width={3}  height={2}  fill="#d8d0c4" />
+                <rect x={mx + 35} y={deskY + 3} width={2}  height={4}  fill="#d8d0c4" />
+                <rect x={mx + 34} y={deskY + 5} width={3}  height={2}  fill="#d8d0c4" />
+                {/* Steam */}
+                <rect x={mx + 28} y={deskY - 2} width={1.5} height={2}
+                  fill="#9999bb"
+                  opacity={0.12 + Math.sin(tick * 0.09 + si) * 0.06} />
+                <rect x={mx + 31} y={deskY - 3} width={1.5} height={3}
+                  fill="#9999bb"
+                  opacity={0.12 + Math.sin(tick * 0.09 + si + 1) * 0.06} />
+              </g>
+            )}
+            {si % 3 === 1 && (
+              <g>
+                {/* Rubber duck */}
+                <rect x={mx + 26} y={deskY + 3} width={8}  height={6}  fill="#D4A843" />
+                <rect x={mx + 30} y={deskY}     width={5}  height={5}  fill="#D4A843" />
+                <rect x={mx + 33} y={deskY + 2} width={4}  height={2}  fill="#CF5050" opacity={0.7} />
+                <rect x={mx + 27} y={deskY + 2} width={2}  height={2}  fill="#1a1a2a" />
+              </g>
+            )}
+            {si % 3 === 2 && (
+              <g>
+                {/* Notepad */}
+                <rect x={mx + 26} y={deskY + 1} width={10} height={7}  fill="#e8e0d0" />
+                <rect x={mx + 27} y={deskY + 2} width={8}  height={1}  fill="#b0a898" opacity={0.5} />
+                <rect x={mx + 27} y={deskY + 4} width={8}  height={1}  fill="#b0a898" opacity={0.4} />
+                <rect x={mx + 27} y={deskY + 6} width={5}  height={1}  fill="#b0a898" opacity={0.3} />
+              </g>
+            )}
+          </g>
         );
       })}
     </g>
   );
 }
 
-// ── Rubber Duck ───────────────────────────────────────────────
-function RubberDuck({ x, y, tick }) {
-  const bob = Math.sin(tick * 0.08) * 0.8;
-  return (
-    <g transform={`translate(0, ${bob})`}>
-      {/* Body */}
-      <rect x={x} y={y + 4} width={12} height={10} fill="#FFD93D" rx={2} />
-      {/* Head */}
-      <rect x={x + 2} y={y} width={10} height={8} fill="#FFD93D" rx={2} />
-      {/* Beak */}
-      <rect x={x + 11} y={y + 3} width={5} height={3} fill="#FF8C00" rx={1} />
-      {/* Eye */}
-      <rect x={x + 8} y={y + 2} width={2} height={2} fill="#1a1a2e" />
-      {/* Wing */}
-      <rect x={x + 1} y={y + 6} width={4} height={5} fill="#F0C830" rx={1} />
-    </g>
-  );
-}
-
-// ── Desk ──────────────────────────────────────────────────────
-function Desk({ x, y, width }) {
+// ── Chair (front-facing, we see the seat) ─────────────────────
+function Chair({ cx, y, color }) {
+  // cx = horizontal center of chair
   return (
     <g>
-      {/* Desk surface */}
-      <rect x={x} y={y} width={width} height={8} fill="#5c4033" rx={2} />
-      <rect x={x + 2} y={y + 1} width={width - 4} height={3} fill="#6d4c3a" rx={1} />
-      {/* Legs */}
-      <rect x={x + 8} y={y + 8} width={6} height={20} fill="#4a3328" rx={1} />
-      <rect x={x + width - 14} y={y + 8} width={6} height={20} fill="#4a3328" rx={1} />
-      {/* Shelf bar under desk */}
-      <rect x={x + 6} y={y + 22} width={width - 12} height={3} fill="#4a3328" rx={1} />
+      {/* Chair back (behind mascot, we see front face of back) */}
+      <rect x={cx - 14} y={y - 14} width={28} height={18} fill="#1c1c38" rx={2} />
+      <rect x={cx - 13} y={y - 13} width={26} height={16} fill="#181832" rx={2} />
+      {/* Color accent strip on chair back */}
+      <rect x={cx - 13} y={y - 13} width={26} height={3}  fill={color} opacity={0.1} rx={1} />
+      {/* Seat */}
+      <rect x={cx - 16} y={y + 3}  width={32} height={6}  fill="#1c1c38" rx={2} />
+      <rect x={cx - 15} y={y + 4}  width={30} height={4}  fill="#181832" rx={1} />
+      {/* Central post */}
+      <rect x={cx - 2}  y={y + 8}  width={4}  height={8}  fill="#222240" />
+      {/* Wheeled base (star shape via 3 rects) */}
+      <rect x={cx - 14} y={y + 16} width={28} height={3}  fill="#1e1e3a" rx={1} />
+      <rect x={cx - 3}  y={y + 14} width={6}  height={7}  fill="#1e1e3a" rx={1} />
+      {/* Wheels */}
+      <rect x={cx - 15} y={y + 18} width={4}  height={3}  fill="#151525" rx={1} />
+      <rect x={cx + 11} y={y + 18} width={4}  height={3}  fill="#151525" rx={1} />
+      <rect x={cx - 3}  y={y + 20} width={6}  height={2}  fill="#151525" rx={1} />
     </g>
   );
 }
 
 // ── Task Bubble ───────────────────────────────────────────────
-function TaskBubble({ x, y, text, color }) {
-  const maxChars = 20;
-  const display = text.length > maxChars ? text.slice(0, maxChars - 2) + ".." : text;
-  const bubbleW = Math.max(display.length * 5.5 + 12, 50);
-  const bx = x - bubbleW / 2;
+function TaskBubble({ cx, y, text, color, tick }) {
+  const maxChars = 14;
+  const display  = text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text;
+  const bubbleW  = Math.min(Math.max(display.length * 4.6 + 14, 44), 70);
+  const bubbleH  = 13;
+  const bx       = cx - bubbleW / 2;
+
+  const dot1 = 0.45 + Math.sin(tick * 0.13)        * 0.3;
+  const dot2 = 0.45 + Math.sin(tick * 0.13 + 1.1)  * 0.3;
+
   return (
     <g>
-      {/* Bubble background */}
-      <rect x={bx} y={y} width={bubbleW} height={18} fill="#1a1a2e" rx={4} stroke={color} strokeWidth={1} opacity={0.92} />
-      {/* Pointer triangle */}
-      <polygon points={`${x - 4},${y + 18} ${x + 4},${y + 18} ${x},${y + 23}`} fill="#1a1a2e" stroke={color} strokeWidth={1} />
-      {/* Cover the stroke where pointer meets bubble */}
-      <rect x={x - 5} y={y + 16} width={10} height={3} fill="#1a1a2e" />
+      {/* Shadow */}
+      <rect x={bx + 1} y={y + 1} width={bubbleW} height={bubbleH}
+        fill="#000" opacity={0.1} rx={6} />
+      {/* Bubble body */}
+      <rect x={bx} y={y} width={bubbleW} height={bubbleH}
+        fill="#12121e" rx={6} stroke={color} strokeWidth={0.5} opacity={0.94} />
       {/* Text */}
-      <text x={x} y={y + 12.5} textAnchor="middle" fill={color} fontSize="7" fontFamily="monospace" opacity={0.9}>
+      <text x={cx} y={y + 9} textAnchor="middle"
+        fill={color} fontSize="5" fontFamily="monospace" opacity={0.9}>
         {display}
       </text>
+      {/* Thought dots */}
+      <rect x={cx - 1}  y={y + bubbleH + 2} width={3} height={3}
+        fill="#12121e" stroke={color} strokeWidth={0.4}
+        rx={1.5} opacity={dot1} />
+      <rect x={cx - 4}  y={y + bubbleH + 5} width={2} height={2}
+        fill="#12121e" stroke={color} strokeWidth={0.3}
+        rx={1} opacity={dot2} />
     </g>
   );
 }
 
-// ── Claude Figure ─────────────────────────────────────────────
-function ClaudeFigure({ x, y, agent, tick, index, entryTick }) {
-  // Entry animation
+// ── Clawd Mascot (front-facing, s=0.35) ──────────────────────
+// SHAPE IS LOCKED. Only scale changed to 0.35.
+function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
   const age = tick - entryTick;
-  const entryOffset = age < 15 ? (15 - age) * 4 : 0;
-  const entryOpacity = age < 15 ? age / 15 : 1;
 
-  // Idle bob
-  const bob = Math.sin(tick * 0.15 + index * 1.2) * 1.5;
+  const walkDuration = 35;
+  const sitDuration  = 8;
 
-  // Blink: eyes squish every ~40 ticks (each agent offset)
-  const blinkCycle = (tick + index * 13) % 45;
-  const isBlinking = blinkCycle < 2;
+  const isWalking = age < walkDuration;
+  const isSitting = age >= walkDuration && age < walkDuration + sitDuration;
+  const isSeated  = age >= walkDuration + sitDuration;
 
-  // Antenna wiggle
-  const antennaL = Math.sin(tick * 0.2 + index * 0.8) * 2;
-  const antennaR = Math.sin(tick * 0.2 + index * 0.8 + 1.5) * 2;
+  // Walk: ease-out from right side
+  const walkProgress = Math.min(age / walkDuration, 1);
+  const eased  = 1 - Math.pow(1 - walkProgress, 2.5);
+  const startX = 730;
+  const currentCX = isWalking ? startX + (cx - startX) * eased : cx;
 
-  // Typing arms
-  const armPhase = Math.sin(tick * 0.3 + index * 0.5);
-  const leftArmX = armPhase > 0 ? -2 : 0;
-  const rightArmX = armPhase > 0 ? 0 : 2;
+  // Walk bounce
+  const walkBounce = isWalking ? Math.abs(Math.sin(age * 0.55)) * -3 : 0;
 
-  const figX = x + entryOffset;
-  const figY = y + bob;
+  // Sit-down settle
+  let sitOffset = 0;
+  if (isSitting) {
+    const sp = (age - walkDuration) / sitDuration;
+    sitOffset = sp < 0.7 ? (sp / 0.7) * 4 : 4 - ((sp - 0.7) / 0.3) * 1;
+  }
+
+  // Idle bob (very subtle)
+  const idleBob = isSeated ? Math.sin(tick * 0.09 + index * 1.2) * 1.0 : 0;
+
+  // Look-around: slight eye shift
+  const lookPhase = (tick + index * 23) % 80;
+  const eyeShift  = isSeated && lookPhase >= 72 && lookPhase < 77 ? -1 : 0;
+
+  // Blink
+  const blinkCycle = (tick + index * 19) % 65;
+  const isBlink    = isSeated && blinkCycle >= 57;
+
+  // Walking leg animation
+  const walkCycle = isWalking ? Math.sin(age * 0.55) : 0;
+
+  // Sitting leg tuck
+  let legTuck = 0;
+  if (isSitting) {
+    const sp = (age - walkDuration) / sitDuration;
+    legTuck = sp < 0.5 ? sp * 3 : (1 - sp) * 3;
+  }
+
+  const entryOpacity = Math.min(age / 5, 1);
+
+  // Scale
+  const s  = 0.35;
+  const bw = 88 * s;   // 30.8
+  const bh = 68 * s;   // 23.8
+  const ew = 13 * s;   //  4.55
+  const eh = 19 * s;   //  6.65
+  const lw = 10 * s;   //  3.5
+  const lh = Math.max((18 - legTuck) * s, 3);
+
+  // bx = left edge of body, centered on cx
+  const bx = currentCX - bw / 2;
+  // typingLean applied below after it's computed
+  const by0 = targetY + walkBounce + sitOffset + idleBob;
+
+  const col = agent.color;
+  const acc = agent.accent;
+  const lit = agent.light;
+
+  // Walking leg Y offsets
+  const legYL1 = isWalking ? walkCycle * 3   : 0;
+  const legYL2 = isWalking ? -walkCycle * 3  : 0;
+  const legYR1 = isWalking ? -walkCycle * 3  : 0;
+  const legYR2 = isWalking ? walkCycle * 3   : 0;
+
+  // Typing animation: ears wiggle, body leans forward slightly
+  const earWiggle = isSeated ? Math.sin(tick * 0.22 + index * 0.9) * 0.5 : 0;
+  const typingLean = isSeated ? Math.sin(tick * 0.15 + index * 0.6) * 0.6 : 0;
+  const by = by0 + typingLean;
+
+  const totalW = ew + bw + ew;
+  const totalH = bh + lh;
 
   return (
     <g opacity={entryOpacity}>
-      {/* Shadow */}
-      <ellipse cx={figX + 18} cy={y + 56} rx={16} ry={3} fill="#000" opacity={0.2} />
+      {/* Shadow on floor */}
+      <ellipse
+        cx={currentCX} cy={by + totalH + 1}
+        rx={totalW * 0.45} ry={2}
+        fill="#000" opacity={0.15}
+      />
 
-      {/* Legs */}
-      <rect x={figX + 6} y={figY + 44} width={7} height={10} fill={agent.accent} rx={1} />
-      <rect x={figX + 23} y={figY + 44} width={7} height={10} fill={agent.accent} rx={1} />
+      {/* BODY */}
+      <rect x={bx} y={by} width={bw} height={bh} fill={col} />
+      {/* Body highlight top */}
+      <rect x={bx} y={by} width={bw} height={2}   fill={lit} opacity={0.18} />
+      {/* Body shadow bottom */}
+      <rect x={bx} y={by + bh - 2} width={bw} height={2} fill={acc} opacity={0.25} />
+      {/* Body pixel detail: side panel lines */}
+      <rect x={bx + 2}    y={by + 4} width={1} height={bh - 8} fill={acc} opacity={0.12} />
+      <rect x={bx + bw - 3} y={by + 4} width={1} height={bh - 8} fill={acc} opacity={0.12} />
 
-      {/* Body */}
-      <rect x={figX + 2} y={figY + 24} width={32} height={22} fill={agent.color} rx={2} />
-      {/* Body texture pixels */}
-      <rect x={figX + 6} y={figY + 28} width={3} height={3} fill={agent.accent} opacity={0.4} />
-      <rect x={figX + 26} y={figY + 36} width={3} height={3} fill={agent.accent} opacity={0.4} />
-      <rect x={figX + 14} y={figY + 32} width={3} height={3} fill={agent.accent} opacity={0.3} />
+      {/* SIDE EARS */}
+      <rect x={bx - ew + earWiggle}    y={by + 16 * s} width={ew} height={eh} fill={col} />
+      <rect x={bx + bw - earWiggle}    y={by + 16 * s} width={ew} height={eh} fill={col} />
+      {/* Ear inner shadow */}
+      <rect x={bx - ew + earWiggle + 1} y={by + 16 * s + 1} width={ew - 2} height={eh - 2} fill={acc} opacity={0.15} />
+      <rect x={bx + bw - earWiggle + 1} y={by + 16 * s + 1} width={ew - 2} height={eh - 2} fill={acc} opacity={0.15} />
 
-      {/* Arms */}
-      <rect x={figX - 4 + leftArmX} y={figY + 28} width={6} height={12} fill={agent.color} rx={1} />
-      <rect x={figX + 34 + rightArmX} y={figY + 28} width={6} height={12} fill={agent.color} rx={1} />
-
-      {/* Head */}
-      <rect x={figX} y={figY + 4} width={36} height={22} fill={agent.color} rx={2} />
-
-      {/* Antenna left */}
-      <rect x={figX + 6 + antennaL} y={figY - 8} width={3} height={14} fill={agent.accent} rx={1} />
-      <circle cx={figX + 7.5 + antennaL} cy={figY - 9} r={3} fill={agent.accent} />
-
-      {/* Antenna right */}
-      <rect x={figX + 27 + antennaR} y={figY - 8} width={3} height={14} fill={agent.accent} rx={1} />
-      <circle cx={figX + 28.5 + antennaR} cy={figY - 9} r={3} fill={agent.accent} />
-
-      {/* Eyes */}
-      {isBlinking ? (
+      {/* EYES */}
+      {isBlink ? (
         <>
-          <rect x={figX + 8} y={figY + 13} width={8} height={2} fill="#1a1a2e" rx={0.5} />
-          <rect x={figX + 21} y={figY + 13} width={8} height={2} fill="#1a1a2e" rx={0.5} />
+          {/* > < chevron blink */}
+          <rect x={bx + 15 * s} y={by + 13 * s} width={7 * s} height={7 * s} fill="#1a1a1a" />
+          <rect x={bx + 22 * s} y={by + 20 * s} width={7 * s} height={7 * s} fill="#1a1a1a" />
+          <rect x={bx + 15 * s} y={by + 27 * s} width={7 * s} height={7 * s} fill="#1a1a1a" />
+          <rect x={bx + 66 * s} y={by + 13 * s} width={7 * s} height={7 * s} fill="#1a1a1a" />
+          <rect x={bx + 59 * s} y={by + 20 * s} width={7 * s} height={7 * s} fill="#1a1a1a" />
+          <rect x={bx + 66 * s} y={by + 27 * s} width={7 * s} height={7 * s} fill="#1a1a1a" />
         </>
       ) : (
         <>
-          <rect x={figX + 8} y={figY + 10} width={8} height={8} fill="#1a1a2e" rx={1} />
-          <rect x={figX + 21} y={figY + 10} width={8} height={8} fill="#1a1a2e" rx={1} />
-          {/* Shine */}
-          <rect x={figX + 12} y={figY + 11} width={3} height={3} fill="#fff" opacity={0.9} />
-          <rect x={figX + 25} y={figY + 11} width={3} height={3} fill="#fff" opacity={0.9} />
+          {/* Vertical slot eyes */}
+          <rect x={bx + 18 * s + eyeShift} y={by + 16 * s} width={8 * s} height={24 * s} fill="#1a1a1a" />
+          <rect x={bx + 62 * s + eyeShift} y={by + 16 * s} width={8 * s} height={24 * s} fill="#1a1a1a" />
+          {/* Eye shine pixels */}
+          <rect x={bx + 19 * s + eyeShift} y={by + 17 * s} width={2 * s} height={2 * s} fill="#ffffff" opacity={0.5} />
+          <rect x={bx + 63 * s + eyeShift} y={by + 17 * s} width={2 * s} height={2 * s} fill="#ffffff" opacity={0.5} />
         </>
       )}
 
-      {/* Name tag */}
-      <text
-        x={figX + 18}
-        y={y + 66}
-        textAnchor="middle"
-        fill={agent.color}
-        fontSize="6"
-        fontFamily="monospace"
-        opacity={0.7}
-      >
-        {agent.name}
-      </text>
+      {/* LEGS */}
+      <rect x={bx + 5  * s} y={by + bh + legYL1} width={lw} height={lh} fill={acc} />
+      <rect x={bx + 19 * s} y={by + bh + legYL2} width={lw} height={lh} fill={acc} />
+      <rect x={bx + 59 * s} y={by + bh + legYR1} width={lw} height={lh} fill={acc} />
+      <rect x={bx + 73 * s} y={by + bh + legYR2} width={lw} height={lh} fill={acc} />
+
+      {/* Name tag (only when seated) */}
+      {isSeated && (
+        <text
+          x={currentCX} y={by + totalH + 10}
+          textAnchor="middle"
+          fill={col} fontSize="4.5" fontFamily="monospace" opacity={0.55}
+        >
+          {agent.name}
+        </text>
+      )}
+
+      {/* Typing indicator dots (when seated) */}
+      {isSeated && (
+        <g>
+          {[0, 1, 2].map(di => {
+            const phase = (tick * 0.18 + di * 0.85) % (Math.PI * 2);
+            const op  = Math.max(0, 0.25 + Math.sin(phase) * 0.5);
+            const dy2 = Math.sin(phase) * 1.2;
+            return (
+              <rect
+                key={di}
+                x={currentCX - 4 + di * 4} y={by + totalH + 13 + dy2}
+                width={2} height={2}
+                fill={col} opacity={op} rx={1}
+              />
+            );
+          })}
+        </g>
+      )}
     </g>
   );
 }
 
 // ── HUD Bar ───────────────────────────────────────────────────
-function HUD({ mode, agentCount, tick }) {
-  const dots = ".".repeat((tick % 12) < 3 ? 1 : (tick % 12) < 6 ? 2 : (tick % 12) < 9 ? 3 : 0);
-  const tokenK = 124 + Math.floor(tick * 0.3) % 200;
+function HUD({ mode, agentCount, tick, projectName }) {
+  const dotCount = Math.floor(tick / 3) % 4;
+  const dots     = ".".repeat(dotCount);
+  const tokenK   = 124 + (Math.floor(tick * 0.28) % 200);
   return (
     <g>
-      <rect x={0} y={0} width={700} height={28} fill="#12121e" />
-      <rect x={0} y={27} width={700} height={1} fill="#2a2a3e" />
-      {/* Left: title */}
-      <text x={12} y={18} fill="#E07045" fontSize="10" fontFamily="monospace" fontWeight="bold">
-        oh-my-claudecode
+      <rect x={0} y={0} width={700} height={28} fill="#080810" />
+      <rect x={0} y={27} width={700} height={1}  fill="#1a1a30" />
+
+      <text x={12} y={18} fill="#C47050" fontSize="9.5" fontFamily="monospace" fontWeight="bold">
+        {projectName || "oh-my-claudecode"}
       </text>
-      {/* Mode */}
-      <text x={180} y={18} fill="#8888aa" fontSize="9" fontFamily="monospace">
-        {mode}
-      </text>
-      {/* Agent count */}
-      <text x={300} y={18} fill="#8888aa" fontSize="9" fontFamily="monospace">
-        agents: {agentCount}
-      </text>
-      {/* Tokens */}
-      <text x={420} y={18} fill="#8888aa" fontSize="9" fontFamily="monospace">
-        {tokenK}k tokens
-      </text>
-      {/* Clauding indicator */}
-      <text x={560} y={18} fill="#5BA55B" fontSize="9" fontFamily="monospace">
+
+      <rect x={168} y={7}  width={1}  height={14} fill="#1a1a30" />
+      <text x={178} y={18} fill="#666" fontSize="8.5" fontFamily="monospace">{mode}</text>
+
+      <rect x={268} y={7}  width={1}  height={14} fill="#1a1a30" />
+      <text x={278} y={18} fill="#666" fontSize="8.5" fontFamily="monospace">agents: {agentCount}</text>
+
+      <rect x={368} y={7}  width={1}  height={14} fill="#1a1a30" />
+      <text x={378} y={18} fill="#666" fontSize="8.5" fontFamily="monospace">{tokenK}k tokens</text>
+
+      <text x={498} y={18} fill="#5BA55B" fontSize="8.5" fontFamily="monospace">
         Clauding{dots}
       </text>
-      {/* Model */}
-      <text x={650} y={18} fill="#666680" fontSize="8" fontFamily="monospace">
-        Opus (1M)
+
+      <rect x={610} y={6}  width={78}  height={16} fill="#0c0c18" rx={3} stroke="#1a1a30" strokeWidth={0.5} />
+      <text x={649} y={17.5} textAnchor="middle" fill="#555" fontSize="7" fontFamily="monospace">
+        Opus (1M ctx)
       </text>
     </g>
   );
 }
 
+// ── Grid layout helpers ────────────────────────────────────────
+// Returns rows: [{deskY, mascotY, stations: [{cx, color}]}]
+function getLayout(agents) {
+  // Station width (how much horizontal space per agent)
+  const SW = 72;
+  // Row 1 deskY (desk surface top), mascots sit just in front of desk
+  const ROW1_DESK_Y   = 58;    // desk surface
+  const ROW1_MASCOT_Y = 84;    // mascot top
+  const ROW2_DESK_Y   = 128;   // second row (only for 9-agent mode)
+  const ROW2_MASCOT_Y = 154;
+
+  const count = agents.length;
+
+  if (count <= 5) {
+    const totalW = count * SW;
+    const startX = (700 - totalW) / 2 + SW / 2;
+    const stations = agents.map((ag, i) => ({ cx: startX + i * SW, color: ag.color }));
+    return [{ deskY: ROW1_DESK_Y, mascotY: ROW1_MASCOT_Y, stations, agentOffset: 0 }];
+  } else {
+    // 9 agents: 5 top, 4 bottom
+    const top    = agents.slice(0, 5);
+    const bottom = agents.slice(5);
+    const topW   = top.length    * SW;
+    const botW   = bottom.length * SW;
+    const topStartX  = (700 - topW)  / 2 + SW / 2;
+    const botStartX  = (700 - botW)  / 2 + SW / 2;
+    return [
+      {
+        deskY: ROW1_DESK_Y, mascotY: ROW1_MASCOT_Y,
+        stations: top.map((ag, i) => ({ cx: topStartX + i * SW, color: ag.color })),
+        agentOffset: 0,
+      },
+      {
+        deskY: ROW2_DESK_Y, mascotY: ROW2_MASCOT_Y,
+        stations: bottom.map((ag, i) => ({ cx: botStartX + i * SW, color: ag.color })),
+        agentOffset: 5,
+      },
+    ];
+  }
+}
+
 // ── Main Scene ────────────────────────────────────────────────
 export default function OMCScene() {
-  const [tick, setTick] = useState(0);
-  const [modeIdx, setModeIdx] = useState(0);
-  const [agentTasks, setAgentTasks] = useState({});
-  const [sparkles, setSparkles] = useState([]);
-  const [entryTicks, setEntryTicks] = useState({ 0: 0 });
+  const [tick,        setTick]        = useState(0);
+  const [modeIdx,     setModeIdx]     = useState(0);
+  const [agentTasks,  setAgentTasks]  = useState({});
+  const [sparkles,    setSparkles]    = useState([]);
+  const [entryTicks,  setEntryTicks]  = useState({ 0: 0 });
+  const [projectName, setProjectName] = useState("");
 
-  const mode = MODES[modeIdx];
+  const mode         = MODES[modeIdx];
   const activeAgents = AGENTS.slice(0, mode.count);
 
-  // Animation loop
+  // VS Code message listener — receives project info and auto-sets mode
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 100);
+    function handleMessage(event) {
+      const msg = event.data;
+      if (msg.type === "projectTasks") window.projectTasks = msg.tasks;
+      if (msg.type === "projectName")  setProjectName(msg.name);
+      if (msg.type === "setMode" && typeof msg.modeIdx === "number") {
+        const idx = Math.max(0, Math.min(msg.modeIdx, MODES.length - 1));
+        if (idx !== modeIdx) {
+          const prevCount = MODES[modeIdx].count;
+          const newCount = MODES[idx].count;
+          setModeIdx(idx);
+          if (newCount > prevCount) {
+            setEntryTicks((prev) => {
+              const next = { ...prev };
+              for (let i = prevCount; i < newCount; i++) next[i] = tick;
+              return next;
+            });
+          }
+        }
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [modeIdx, tick]);
+
+  // Tick loop
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 100);
     return () => clearInterval(id);
   }, []);
 
-  // Rotate tasks every ~50 ticks per agent
+  // Rotate tasks
   useEffect(() => {
     if (tick % 50 === 0) {
-      const newTasks = {};
+      const pool = getTaskPool();
+      const next = {};
       activeAgents.forEach((_, i) => {
-        newTasks[i] = TASKS_POOL[Math.floor(Math.random() * TASKS_POOL.length)];
+        next[i] = pool[Math.floor(Math.random() * pool.length)];
       });
-      setAgentTasks(newTasks);
+      setAgentTasks(next);
     }
   }, [tick, activeAgents.length]);
 
-  // Spawn sparkles
+  // Sparkles
   useEffect(() => {
     if (tick % 8 === 0 && activeAgents.length > 0) {
-      const agentIdx = Math.floor(Math.random() * activeAgents.length);
-      const spacing = Math.min(70, 500 / Math.max(activeAgents.length, 1));
-      const startX = 350 - (activeAgents.length * spacing) / 2;
-      const sx = startX + agentIdx * spacing + 18 + (Math.random() - 0.5) * 20;
-      setSparkles((prev) => [
-        ...prev.filter((s) => tick - s.born < 30).slice(-20),
-        { x: sx, y: 180, born: tick, color: activeAgents[agentIdx].color },
+      const ai  = Math.floor(Math.random() * activeAgents.length);
+      const rows = getLayout(activeAgents);
+      let rowIdx = 0, stationIdx = ai;
+      if (rows.length > 1 && ai >= 5) { rowIdx = 1; stationIdx = ai - 5; }
+      const row = rows[rowIdx];
+      if (!row || !row.stations[stationIdx]) return;
+      const st = row.stations[stationIdx];
+      const sx = st.cx + (Math.random() - 0.5) * 16;
+      const sy = row.mascotY - 8;
+      setSparkles(prev => [
+        ...prev.filter(s => tick - s.born < 22).slice(-20),
+        { x: sx, y: sy, born: tick, color: activeAgents[ai].color },
       ]);
     }
   }, [tick, activeAgents.length]);
 
-  // Mode switch handler
-  const switchMode = useCallback(
-    (idx) => {
-      const prevCount = MODES[modeIdx].count;
-      const newCount = MODES[idx].count;
-      setModeIdx(idx);
-      // Record entry ticks for new agents
-      if (newCount > prevCount) {
-        setEntryTicks((prev) => {
-          const next = { ...prev };
-          for (let i = prevCount; i < newCount; i++) {
-            next[i] = tick;
-          }
-          return next;
-        });
-      }
-    },
-    [modeIdx, tick]
-  );
+  const switchMode = useCallback((idx) => {
+    const prevCount = MODES[modeIdx].count;
+    const newCount  = MODES[idx].count;
+    setModeIdx(idx);
+    if (newCount > prevCount) {
+      setEntryTicks(prev => {
+        const next = { ...prev };
+        for (let i = prevCount; i < newCount; i++) next[i] = tick;
+        return next;
+      });
+    }
+  }, [modeIdx, tick]);
 
-  // Layout
-  const spacing = Math.min(70, 500 / Math.max(activeAgents.length, 1));
-  const totalWidth = activeAgents.length * spacing + 40;
-  const startX = 350 - totalWidth / 2 + 20;
-  const deskX = startX - 20;
-  const deskY = 280;
-  const figureBaseY = 220;
+  const rows = getLayout(activeAgents);
 
   return (
-    <div
-      style={{
-        background: "#0a0a1a",
-        borderRadius: 8,
-        padding: 0,
-        overflow: "hidden",
-        maxWidth: 750,
-        margin: "0 auto",
-        fontFamily: "monospace",
-      }}
-    >
-      <svg viewBox="0 0 700 400" width="100%" style={{ display: "block" }}>
-        {/* Background */}
-        <rect x={0} y={0} width={700} height={400} fill="#0a0a1a" />
+    <div style={{
+      background: "transparent",
+      overflow: "hidden",
+      maxWidth: 800,
+      margin: "0 auto",
+      fontFamily: "monospace",
+    }}>
+      <svg viewBox="0 0 700 200" width="100%" style={{ display: "block" }}>
 
-        {/* Subtle grid lines */}
-        {[100, 200, 300, 400, 500, 600].map((gx) => (
-          <line key={gx} x1={gx} y1={30} x2={gx} y2={400} stroke="#141428" strokeWidth={1} />
-        ))}
-        {[80, 160, 240, 320].map((gy) => (
-          <line key={gy} x1={0} y1={gy} x2={700} y2={gy} stroke="#141428" strokeWidth={1} />
-        ))}
+        {/* No background — transparent overlay */}
 
-        {/* HUD */}
-        <HUD mode={mode.label} agentCount={activeAgents.length} tick={tick} />
+        {/* HUD hidden in overlay mode — uncomment for standalone */}
+        {/* <HUD
+          mode={mode.label}
+          agentCount={activeAgents.length}
+          tick={tick}
+          projectName={projectName}
+        /> */}
 
-        {/* Desk */}
-        <Desk x={deskX} y={deskY} width={totalWidth} />
+        {/* Render each desk row */}
+        {rows.map((row, ri) => (
+          <g key={`row${ri}`}>
+            {/* 1. Chairs (furthest back) */}
+            {row.stations.map((st, si) => {
+              const agentIdx = row.agentOffset + si;
+              const age = tick - (entryTicks[agentIdx] || 0);
+              const isVisible = age >= 35 + 8 - 4;
+              if (!isVisible) return null;
+              return (
+                <Chair key={`chair${agentIdx}`}
+                  cx={st.cx} y={row.mascotY + 22} color={st.color} />
+              );
+            })}
 
-        {/* Monitors on desk */}
-        {activeAgents.map((agent, i) => (
-          <Monitor
-            key={`mon-${i}`}
-            x={startX + i * spacing + 4}
-            y={deskY - 26}
-            color={agent.color}
-            tick={tick}
-          />
-        ))}
+            {/* 2. Mascots (behind desk — rendered before desk) */}
+            {row.stations.map((st, si) => {
+              const agentIdx = row.agentOffset + si;
+              const agent = activeAgents[agentIdx];
+              if (!agent) return null;
+              return (
+                <Clawd key={`agent${agentIdx}`}
+                  cx={st.cx} targetY={row.mascotY}
+                  agent={agent} tick={tick} index={agentIdx}
+                  entryTick={entryTicks[agentIdx] || 0} />
+              );
+            })}
 
-        {/* Coffee mug */}
-        <CoffeeMug x={deskX + totalWidth - 20} y={deskY - 16} tick={tick} />
+            {/* 3. Desk + front-facing monitors (IN FRONT of mascots) */}
+            <DeskRow stations={row.stations} deskY={row.deskY} tick={tick} />
 
-        {/* Rubber duck */}
-        <RubberDuck x={deskX + 6} y={deskY - 16} tick={tick} />
-
-        {/* Task bubbles */}
-        {activeAgents.map((agent, i) => (
-          <TaskBubble
-            key={`bubble-${i}`}
-            x={startX + i * spacing + 18}
-            y={figureBaseY - 35}
-            text={agentTasks[i] || "initializing..."}
-            color={agent.color}
-          />
-        ))}
-
-        {/* Agent figures */}
-        {activeAgents.map((agent, i) => (
-          <ClaudeFigure
-            key={`fig-${agent.name}`}
-            x={startX + i * spacing}
-            y={figureBaseY}
-            agent={agent}
-            tick={tick}
-            index={i}
-            entryTick={entryTicks[i] || 0}
-          />
+            {/* 4. Task bubbles (ON TOP of everything) */}
+            {row.stations.map((st, si) => {
+              const agentIdx = row.agentOffset + si;
+              const agent = activeAgents[agentIdx];
+              if (!agent) return null;
+              const isSeated = (tick - (entryTicks[agentIdx] || 0)) >= 43;
+              if (!isSeated) return null;
+              return (
+                <TaskBubble key={`bubble${agentIdx}`}
+                  cx={st.cx} y={row.mascotY - 32}
+                  text={agentTasks[agentIdx] || "initializing..."}
+                  color={agent.color} tick={tick} />
+              );
+            })}
+          </g>
         ))}
 
         {/* Sparkles */}
-        {sparkles
-          .filter((s) => tick - s.born < 30)
-          .map((s, i) => (
-            <Sparkle key={i} x={s.x} y={s.y} age={tick - s.born} color={s.color} />
-          ))}
+        {sparkles.filter(s => tick - s.born < 22).map((s, i) => (
+          <Sparkle key={i} x={s.x} y={s.y} age={tick - s.born} color={s.color} />
+        ))}
+
       </svg>
 
-      {/* Mode buttons */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: 8,
-          padding: "12px 16px",
-          background: "#0e0e1e",
-          borderTop: "1px solid #1a1a2e",
-          flexWrap: "wrap",
-        }}
-      >
+      {/* Mode buttons hidden in overlay mode */}
+      <div style={{ display: "none" }}>
         {MODES.map((m, idx) => (
-          <button
-            key={m.label}
-            onClick={() => switchMode(idx)}
-            style={{
-              background: idx === modeIdx ? "#1a1a2e" : "#0a0a1a",
-              color: idx === modeIdx ? "#E07045" : "#555570",
-              border: `1px solid ${idx === modeIdx ? "#E07045" : "#2a2a3e"}`,
-              borderRadius: 4,
-              padding: "6px 14px",
-              fontFamily: "monospace",
-              fontSize: 13,
-              cursor: "pointer",
-              transition: "none",
-            }}
-          >
+          <button key={m.label} onClick={() => switchMode(idx)}>
             {m.label}
           </button>
         ))}

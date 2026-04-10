@@ -1,0 +1,16 @@
+node_modules/**
+.vscode/**
+.playwright-mcp/**
+.git/**
+*.png
+*.jpg
+*.pdf
+*.avif
+*.vsix
+vite.config.js
+main.jsx
+index.html
+plan.md
+CLAUDE.md
+package-lock.json
+.DS_Store

@@ -1,0 +1,54 @@
+{
+  "name": "omc-pet-scene",
+  "displayName": "OMC Pet Scene",
+  "description": "Pixel-art Clawd mascots for oh-my-claudecode",
+  "version": "0.2.0",
+  "publisher": "jhyoun2028",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "omcPet.show",
+        "title": "OMC Pet: Show Scene"
+      }
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "omcPetPanel",
+          "title": "OMC Pets",
+          "icon": "$(hubot)"
+        }
+      ]
+    },
+    "views": {
+      "omcPetPanel": [
+        {
+          "type": "webview",
+          "id": "omcPet.view",
+          "name": "Pets"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "overlay": "electron overlay.js"
+  },
+  "dependencies": {
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "electron": "^41.2.0",
+    "vite": "^8.0.8"
+  }
+}

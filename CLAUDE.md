@@ -4,11 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A pixel-art interactive scene (single `.jsx` file) showing Claude Code mascot figures sitting at desks. Switching OMC modes spawns/despawns specialized agent figures. Runs as a React artifact on Claude.ai or any React sandbox.
+A pixel-art interactive scene showing Claude Code mascot figures sitting at desks. Switching OMC modes spawns/despawns specialized agent figures. Ships as both a **VS Code extension** (panel webview) and a **standalone Vite dev app**.
+
+## Two Runtime Modes
+
+1. **VS Code extension** — `extension.js` reads `omc-pet-scene.jsx`, strips imports, wraps it in an HTML webview with UMD React/Babel. The extension auto-detects Claude-related terminals and edit velocity to switch modes automatically. Registered as panel view `omcPet.view`.
+2. **Standalone dev** — `main.jsx` + `index.html` + Vite. Standard ES module imports.
 
 ## Development
 
-No build, lint, or test pipeline. The entire app is a single `.jsx` file with no build step. Open it in a Claude.ai artifact or any React sandbox that provides React.
+No lint or test pipeline.
+
+- **Standalone dev server:** `npm run dev` (Vite on localhost)
+- **Extension testing:** open this folder in VS Code → Run & Debug → the panel appears in the bottom bar
+- **Package extension:** `npx @vscode/vsce package` produces a `.vsix`
 
 ## Hard Constraints
 
@@ -21,6 +30,10 @@ No build, lint, or test pipeline. The entire app is a single `.jsx` file with no
 - Mode buttons must be real `<button>` elements
 
 ## Architecture
+
+**Files:** `omc-pet-scene.jsx` is the scene (all components, inline styles). `extension.js` is the VS Code extension host that wraps it in a webview. `main.jsx` + `index.html` + `vite.config.js` are the standalone dev harness.
+
+**Extension ↔ Scene messaging:** `extension.js` posts messages (`setMode`, `projectName`, `projectTasks`) to the webview. The scene listens via `window.addEventListener("message", ...)` and can also read `window.projectTasks` for task text.
 
 **Animation:** One `setInterval(100ms)` increments a `tick` counter. All animation is a pure function of `tick`.
 
