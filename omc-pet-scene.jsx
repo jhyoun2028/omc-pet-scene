@@ -654,30 +654,27 @@ export default function OMCScene() {
       pointerEvents: "none",
       width: "100%",
       lineHeight: 0,
-      position: "relative",
     }}>
-      {/* Corner controls: size − / + / hide. Opt back in to pointer events so
-          only these tiny buttons capture clicks; the rest of the scene stays
-          fully click-through. */}
+      {/* Control strip above the scene: size − / + / hide. Lives in its
+          own row so it can't overlap HUD text, and only the buttons opt
+          back into pointer events — the rest of the strip is click-through. */}
       <div style={{
-        position: "absolute",
-        top: 4,
-        right: 4,
         display: "flex",
+        justifyContent: "flex-end",
         gap: 3,
+        padding: "3px 4px",
         pointerEvents: "none",
-        zIndex: 10,
       }}>
         <button
           onClick={() => setScale((s) => Math.max(0.5, +(s - 0.25).toFixed(2)))}
           disabled={scale <= 0.5}
-          title="Smaller"
+          title={`Smaller (${scale.toFixed(2)}x)`}
           style={btnStyle}
         >−</button>
         <button
           onClick={() => setScale((s) => Math.min(1.5, +(s + 0.25).toFixed(2)))}
           disabled={scale >= 1.5}
-          title="Larger"
+          title={`Larger (${scale.toFixed(2)}x)`}
           style={btnStyle}
         >+</button>
         <button
@@ -689,9 +686,14 @@ export default function OMCScene() {
 
       <svg
         viewBox={`0 0 700 ${vbHeight}`}
-        width={`${Math.round(scale * 100)}%`}
         preserveAspectRatio="xMidYMid meet"
-        style={{ display: "block", pointerEvents: "none", margin: "0 auto" }}
+        style={{
+          display: "block",
+          margin: "0 auto",
+          width: `${Math.round(scale * 700)}px`,
+          maxWidth: "100%",
+          pointerEvents: "none",
+        }}
       >
 
         {/* No background — transparent overlay */}
