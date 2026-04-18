@@ -43,15 +43,26 @@ function activate(context) {
   );
 
   // ── Agent Detection ────────────────────────────────────────
+  // Cache process count so the 3s ticker doesn't shell out every time.
+  let processCountCache = { count: 0, at: 0 };
+  const PROCESS_CACHE_MS = 4000;
+
   function countClaudeProcesses() {
+    // ps/grep are POSIX-only; skip on Windows and fall back to terminal
+    // detection alone rather than spawning a broken pipeline.
+    if (process.platform === "win32") return Promise.resolve(0);
+    const now = Date.now();
+    if (now - processCountCache.at < PROCESS_CACHE_MS) {
+      return Promise.resolve(processCountCache.count);
+    }
     return new Promise((resolve) => {
-      // Count actual claude/anthropic agent processes running on the system
       exec(
         "ps aux | grep -iE '(claude|anthropic|subagent|ccagent)' | grep -v grep | wc -l",
         { timeout: 2000 },
         (err, stdout) => {
-          if (err) return resolve(0);
-          resolve(parseInt(stdout.trim(), 10) || 0);
+          const count = err ? 0 : (parseInt(stdout.trim(), 10) || 0);
+          processCountCache = { count, at: Date.now() };
+          resolve(count);
         }
       );
     });
@@ -110,15 +121,40 @@ function activate(context) {
     if (recentOpens.length > 8) recentOpens.pop();
   }
 
+  // Cache git output so the 3s ticker + edit/save events don't each spawn
+  // their own child process. `git status --porcelain` also includes
+  // untracked files, which `git diff HEAD` misses — matters here because a
+  // lot of work in this repo is untracked assets.
+  let gitChangesCache = { files: [], at: 0 };
+  const GIT_CACHE_MS = 4000;
+
   async function getGitChanges() {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders) return [];
+    const now = Date.now();
+    if (now - gitChangesCache.at < GIT_CACHE_MS) {
+      return gitChangesCache.files;
+    }
     return new Promise((resolve) => {
-      exec("git diff --name-only HEAD 2>/dev/null | head -8",
-        { cwd: folders[0].uri.fsPath },
+      exec("git status --porcelain 2>/dev/null",
+        { cwd: folders[0].uri.fsPath, timeout: 2000 },
         (err, stdout) => {
-          if (err || !stdout) return resolve([]);
-          resolve(stdout.trim().split("\n").filter(Boolean).map((f) => path.basename(f)));
+          if (err || !stdout) {
+            gitChangesCache = { files: [], at: Date.now() };
+            return resolve([]);
+          }
+          // Each line is `XY path`; XY is a 2-char status, path starts at col 3.
+          // Renames use `XY old -> new` — take the `new` side.
+          const files = stdout.trim().split("\n")
+            .filter(Boolean)
+            .slice(0, 8)
+            .map((line) => {
+              const raw = line.slice(3);
+              const arrow = raw.indexOf(" -> ");
+              return path.basename(arrow >= 0 ? raw.slice(arrow + 4) : raw);
+            });
+          gitChangesCache = { files, at: Date.now() };
+          resolve(files);
         });
     });
   }
@@ -179,24 +215,47 @@ function activate(context) {
     }
   }
 
+  // Coalesce sendProjectInfo / detectAgents across bursty events
+  // (keystrokes can fire onDidChangeTextDocument many times per second).
+  let sendPending = null;
+  let detectPending = null;
+  const SEND_DEBOUNCE_MS = 300;
+  const DETECT_DEBOUNCE_MS = 400;
+  function scheduleSend() {
+    if (sendPending) return;
+    sendPending = setTimeout(() => { sendPending = null; sendProjectInfo(); }, SEND_DEBOUNCE_MS);
+  }
+  function scheduleDetect() {
+    if (detectPending) return;
+    detectPending = setTimeout(() => { detectPending = null; detectAgents(); }, DETECT_DEBOUNCE_MS);
+  }
+
   // ── Watchers ───────────────────────────────────────────────
   const watchers = [
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.scheme === "file") recentEdits.push(Date.now());
-      detectAgents();
-      sendProjectInfo();
+      scheduleDetect();
+      scheduleSend();
     }),
-    vscode.workspace.onDidSaveTextDocument((doc) => { trackSave(doc); sendProjectInfo(); }),
-    vscode.window.onDidChangeActiveTextEditor((ed) => { trackOpen(ed); sendProjectInfo(); }),
-    vscode.window.onDidOpenTerminal(() => detectAgents()),
-    vscode.window.onDidCloseTerminal(() => setTimeout(detectAgents, 500)),
-    vscode.workspace.onDidCreateFiles(() => { sendProjectInfo(); detectAgents(); }),
-    vscode.workspace.onDidDeleteFiles(() => sendProjectInfo()),
+    vscode.workspace.onDidSaveTextDocument((doc) => { trackSave(doc); scheduleSend(); }),
+    vscode.window.onDidChangeActiveTextEditor((ed) => { trackOpen(ed); scheduleSend(); }),
+    vscode.window.onDidOpenTerminal(() => scheduleDetect()),
+    vscode.window.onDidCloseTerminal(() => setTimeout(scheduleDetect, 500)),
+    vscode.workspace.onDidCreateFiles(() => { scheduleSend(); scheduleDetect(); }),
+    vscode.workspace.onDidDeleteFiles(() => scheduleSend()),
   ];
 
-  const interval = setInterval(() => { detectAgents(); sendProjectInfo(); }, 3000);
+  // Periodic refresh picks up things the event watchers miss (terminal
+  // renames, background process churn). Goes through the same scheduler.
+  const interval = setInterval(() => { scheduleDetect(); scheduleSend(); }, 3000);
 
-  context.subscriptions.push(...watchers, { dispose: () => clearInterval(interval) });
+  context.subscriptions.push(...watchers, {
+    dispose: () => {
+      clearInterval(interval);
+      if (sendPending) clearTimeout(sendPending);
+      if (detectPending) clearTimeout(detectPending);
+    },
+  });
 }
 
 function buildHTML(sceneJsx) {

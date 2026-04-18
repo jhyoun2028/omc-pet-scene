@@ -40,8 +40,15 @@
   },
   "scripts": {
     "dev": "vite",
+    "build": "vite build",
+    "package": "vite build && vsce package",
     "overlay": "electron overlay.js"
   },
+  "files": [
+    "extension.js",
+    "omc-pet-scene.jsx",
+    "dist/**"
+  ],
   "dependencies": {
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
