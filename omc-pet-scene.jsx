@@ -33,17 +33,18 @@ const AGENT_ROLE_TASKS = {
   Validator:       ["testing {f}...", "verifying output...", "running checks...", "validating types...", "confirming fix..."],
 };
 
-function getRoleTask(agentName, index, tick) {
+function getRoleTask(agentName, index, tick, projectTasks) {
+  // If the extension sent real task strings, assign them to agents in order
+  // (extension.js already orders them by recency/relevance). Slowly rotate
+  // when there are more tasks than agents so everyone gets a turn.
+  if (projectTasks && projectTasks.length > 0) {
+    const offset = Math.floor(tick / 80);
+    return projectTasks[(index + offset) % projectTasks.length];
+  }
+  // Fallback: role-specific templates
   const pool = AGENT_ROLE_TASKS[agentName] || AGENT_ROLE_TASKS.Worker;
   const template = pool[(Math.floor(tick / 50) + index) % pool.length];
-  // Replace {f} with a real project filename if available
-  const projectTasks = (typeof window !== "undefined" && window.projectTasks) || [];
-  const fileMatch = projectTasks.length > 0
-    ? projectTasks[(index + Math.floor(tick / 50)) % projectTasks.length]
-        .replace(/^(focused on |editing |saved |reviewing |changed |agent: |building |checking |scanning )/, "")
-        .replace(/\.\.\.$/, "")
-    : null;
-  return fileMatch ? template.replace("{f}", fileMatch) : template.replace(" {f}", "");
+  return template.replace(" {f}", "");
 }
 
 // ── Sparkle ───────────────────────────────────────────────────
@@ -195,33 +196,33 @@ function Chair({ cx, y, color }) {
   // cx = horizontal center of chair
   return (
     <g>
-      {/* Chair back (behind mascot, we see front face of back) */}
-      <rect x={cx - 14} y={y - 14} width={28} height={18} fill="#1c1c38" rx={2} />
-      <rect x={cx - 13} y={y - 13} width={26} height={16} fill="#181832" rx={2} />
+      {/* Chair back */}
+      <rect x={cx - 28} y={y - 28} width={56} height={36} fill="#1c1c38" rx={3} />
+      <rect x={cx - 27} y={y - 27} width={54} height={34} fill="#181832" rx={3} />
       {/* Color accent strip on chair back */}
-      <rect x={cx - 13} y={y - 13} width={26} height={3}  fill={color} opacity={0.1} rx={1} />
+      <rect x={cx - 27} y={y - 27} width={54} height={5}  fill={color} opacity={0.1} rx={1} />
       {/* Seat */}
-      <rect x={cx - 16} y={y + 3}  width={32} height={6}  fill="#1c1c38" rx={2} />
-      <rect x={cx - 15} y={y + 4}  width={30} height={4}  fill="#181832" rx={1} />
+      <rect x={cx - 32} y={y + 7}  width={64} height={11} fill="#1c1c38" rx={2} />
+      <rect x={cx - 31} y={y + 8}  width={62} height={9}  fill="#181832" rx={2} />
       {/* Central post */}
-      <rect x={cx - 2}  y={y + 8}  width={4}  height={8}  fill="#222240" />
-      {/* Wheeled base (star shape via 3 rects) */}
-      <rect x={cx - 14} y={y + 16} width={28} height={3}  fill="#1e1e3a" rx={1} />
-      <rect x={cx - 3}  y={y + 14} width={6}  height={7}  fill="#1e1e3a" rx={1} />
+      <rect x={cx - 4}  y={y + 17} width={8}  height={16} fill="#222240" />
+      {/* Wheeled base */}
+      <rect x={cx - 28} y={y + 33} width={56} height={5}  fill="#1e1e3a" rx={1} />
+      <rect x={cx - 5}  y={y + 30} width={10} height={12} fill="#1e1e3a" rx={1} />
       {/* Wheels */}
-      <rect x={cx - 15} y={y + 18} width={4}  height={3}  fill="#151525" rx={1} />
-      <rect x={cx + 11} y={y + 18} width={4}  height={3}  fill="#151525" rx={1} />
-      <rect x={cx - 3}  y={y + 20} width={6}  height={2}  fill="#151525" rx={1} />
+      <rect x={cx - 30} y={y + 37} width={7}  height={5}  fill="#151525" rx={1} />
+      <rect x={cx + 23} y={y + 37} width={7}  height={5}  fill="#151525" rx={1} />
+      <rect x={cx - 4}  y={y + 41} width={8}  height={4}  fill="#151525" rx={1} />
     </g>
   );
 }
 
 // ── Task Bubble ───────────────────────────────────────────────
 function TaskBubble({ cx, y, text, color, tick }) {
-  const maxChars = 14;
+  const maxChars = 20;
   const display  = text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text;
-  const bubbleW  = Math.min(Math.max(display.length * 4.6 + 14, 44), 70);
-  const bubbleH  = 13;
+  const bubbleW  = Math.min(Math.max(display.length * 6.5 + 18, 64), 120);
+  const bubbleH  = 22;
   const bx       = cx - bubbleW / 2;
 
   const dot1 = 0.45 + Math.sin(tick * 0.13)        * 0.3;
@@ -236,8 +237,8 @@ function TaskBubble({ cx, y, text, color, tick }) {
       <rect x={bx} y={y} width={bubbleW} height={bubbleH}
         fill="#12121e" rx={6} stroke={color} strokeWidth={0.5} opacity={0.94} />
       {/* Text */}
-      <text x={cx} y={y + 9} textAnchor="middle"
-        fill={color} fontSize="5" fontFamily="monospace" opacity={0.9}>
+      <text x={cx} y={y + 15} textAnchor="middle"
+        fill={color} fontSize="9" fontFamily="monospace" opacity={0.9}>
         {display}
       </text>
       {/* Thought dots */}
@@ -303,7 +304,7 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
   const entryOpacity = Math.min(age / 5, 1);
 
   // Scale
-  const s  = 0.35;
+  const s  = 0.75;
   const bw = 88 * s;   // 30.8
   const bh = 68 * s;   // 23.8
   const ew = 13 * s;   //  4.55
@@ -391,9 +392,9 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
       {/* Name tag (only when seated) */}
       {isSeated && (
         <text
-          x={currentCX} y={by + totalH + 10}
+          x={currentCX} y={by + totalH + 18}
           textAnchor="middle"
-          fill={col} fontSize="4.5" fontFamily="monospace" opacity={0.55}
+          fill={col} fontSize="9" fontFamily="monospace" opacity={0.55}
         >
           {agent.name}
         </text>
@@ -409,7 +410,7 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
             return (
               <rect
                 key={di}
-                x={currentCX - 4 + di * 4} y={by + totalH + 13 + dy2}
+                x={currentCX - 6 + di * 6} y={by + totalH + 26 + dy2}
                 width={2} height={2}
                 fill={col} opacity={op} rx={1}
               />
@@ -428,29 +429,24 @@ function HUD({ mode, agentCount, tick, projectName }) {
   const tokenK   = 124 + (Math.floor(tick * 0.28) % 200);
   return (
     <g>
-      <rect x={0} y={0} width={700} height={28} fill="#080810" />
-      <rect x={0} y={27} width={700} height={1}  fill="#1a1a30" />
+      <rect x={0} y={0} width={700} height={44} fill="#080810" />
+      <rect x={0} y={43} width={700} height={1}  fill="#1a1a30" />
 
-      <text x={12} y={18} fill="#C47050" fontSize="9.5" fontFamily="monospace" fontWeight="bold">
+      <text x={14} y={30} fill="#C47050" fontSize="16" fontFamily="monospace" fontWeight="bold">
         {projectName || "oh-my-claudecode"}
       </text>
 
-      <rect x={168} y={7}  width={1}  height={14} fill="#1a1a30" />
-      <text x={178} y={18} fill="#666" fontSize="8.5" fontFamily="monospace">{mode}</text>
+      <rect x={210} y={10} width={1}  height={24} fill="#1a1a30" />
+      <text x={224} y={30} fill="#666" fontSize="14" fontFamily="monospace">{mode}</text>
 
-      <rect x={268} y={7}  width={1}  height={14} fill="#1a1a30" />
-      <text x={278} y={18} fill="#666" fontSize="8.5" fontFamily="monospace">agents: {agentCount}</text>
+      <rect x={340} y={10} width={1}  height={24} fill="#1a1a30" />
+      <text x={354} y={30} fill="#666" fontSize="14" fontFamily="monospace">agents: {agentCount}</text>
 
-      <rect x={368} y={7}  width={1}  height={14} fill="#1a1a30" />
-      <text x={378} y={18} fill="#666" fontSize="8.5" fontFamily="monospace">{tokenK}k tokens</text>
+      <rect x={490} y={10} width={1}  height={24} fill="#1a1a30" />
+      <text x={504} y={30} fill="#666" fontSize="14" fontFamily="monospace">{tokenK}k tokens</text>
 
-      <text x={498} y={18} fill="#5BA55B" fontSize="8.5" fontFamily="monospace">
+      <text x={620} y={30} fill="#5BA55B" fontSize="14" fontFamily="monospace">
         Clauding{dots}
-      </text>
-
-      <rect x={610} y={6}  width={78}  height={16} fill="#0c0c18" rx={3} stroke="#1a1a30" strokeWidth={0.5} />
-      <text x={649} y={17.5} textAnchor="middle" fill="#555" fontSize="7" fontFamily="monospace">
-        Opus (1M ctx)
       </text>
     </g>
   );
@@ -459,11 +455,11 @@ function HUD({ mode, agentCount, tick, projectName }) {
 // ── Grid layout helpers ────────────────────────────────────────
 // Returns rows: [{deskY, mascotY, stations: [{cx, color}]}]
 function getLayout(agents) {
-  const SW = 72;
-  const ROW1_DESK_Y   = 58;
-  const ROW1_MASCOT_Y = 84;
-  const ROW2_DESK_Y   = 128;
-  const ROW2_MASCOT_Y = 154;
+  const SW = 110;
+  const ROW1_DESK_Y   = 80;
+  const ROW1_MASCOT_Y = 110;
+  const ROW2_DESK_Y   = 190;
+  const ROW2_MASCOT_Y = 220;
 
   const count = agents.length;
 
@@ -498,13 +494,14 @@ function getLayout(agents) {
 
 // ── Main Scene ────────────────────────────────────────────────
 export default function OMCScene() {
-  const [tick,        setTick]        = useState(0);
-  const [modeIdx,     setModeIdx]     = useState(0);
-  const [agentCount,  setAgentCount]  = useState(null); // null = use mode count
-  const [agentTasks,  setAgentTasks]  = useState({});
-  const [sparkles,    setSparkles]    = useState([]);
-  const [entryTicks,  setEntryTicks]  = useState({ 0: 0 });
-  const [projectName, setProjectName] = useState("");
+  const [tick,         setTick]         = useState(0);
+  const [modeIdx,      setModeIdx]      = useState(0);
+  const [agentCount,   setAgentCount]   = useState(null); // null = use mode count
+  const [agentTasks,   setAgentTasks]   = useState({});
+  const [sparkles,     setSparkles]     = useState([]);
+  const [entryTicks,   setEntryTicks]   = useState({ 0: 0 });
+  const [projectName,  setProjectName]  = useState("");
+  const [projectTasks, setProjectTasks] = useState([]);
 
   const mode         = MODES[modeIdx];
   // agentCount from extension overrides mode-based count
@@ -515,7 +512,9 @@ export default function OMCScene() {
   useEffect(() => {
     function handleMessage(event) {
       const msg = event.data;
-      if (msg.type === "projectTasks") window.projectTasks = msg.tasks;
+      if (msg.type === "projectTasks") {
+        setProjectTasks(Array.isArray(msg.tasks) ? msg.tasks : []);
+      }
       if (msg.type === "projectName")  setProjectName(msg.name);
       if (msg.type === "setAgentCount" && typeof msg.count === "number") {
         const newCount = Math.max(1, Math.min(msg.count, AGENTS.length));
@@ -557,16 +556,19 @@ export default function OMCScene() {
     return () => clearInterval(id);
   }, []);
 
-  // Rotate tasks — each agent gets role-appropriate tasks
+  // Rotate task bubbles. Runs (a) immediately when projectTasks changes so
+  // real edits appear without a 5s delay, (b) when the active agent count
+  // changes, and (c) on a slow ~3s cadence via the tick bucket so fallback
+  // templates still cycle when the extension isn't sending data.
+  const tickBucket = Math.floor(tick / 30);
   useEffect(() => {
-    if (tick % 50 === 0) {
-      const next = {};
-      activeAgents.forEach((agent, i) => {
-        next[i] = getRoleTask(agent.name, i, tick);
-      });
-      setAgentTasks(next);
-    }
-  }, [tick, activeAgents.length]);
+    const next = {};
+    activeAgents.forEach((agent, i) => {
+      next[i] = getRoleTask(agent.name, i, tick, projectTasks);
+    });
+    setAgentTasks(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickBucket, activeAgents.length, projectTasks]);
 
   // Sparkles
   useEffect(() => {
@@ -610,8 +612,9 @@ export default function OMCScene() {
       maxWidth: 800,
       margin: "0 auto",
       fontFamily: "monospace",
+      pointerEvents: "none",
     }}>
-      <svg viewBox="0 0 700 200" width="100%" style={{ display: "block" }}>
+      <svg viewBox="0 0 700 300" width="100%" style={{ display: "block", pointerEvents: "none" }}>
 
         {/* No background — transparent overlay */}
 
@@ -662,7 +665,7 @@ export default function OMCScene() {
               if (!isSeated) return null;
               return (
                 <TaskBubble key={`bubble${agentIdx}`}
-                  cx={st.cx} y={row.mascotY - 32}
+                  cx={st.cx} y={row.mascotY - 52}
                   text={agentTasks[agentIdx] || "initializing..."}
                   color={agent.color} tick={tick} />
               );
