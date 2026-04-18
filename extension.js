@@ -1,6 +1,6 @@
 const vscode = require("vscode");
-const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { exec } = require("child_process");
 
 function activate(context) {
@@ -15,11 +15,12 @@ function activate(context) {
   const provider = {
     resolveWebviewView(view) {
       webviewView = view;
-      view.webview.options = { enableScripts: true };
-
-      const scenePath = path.join(context.extensionPath, "omc-pet-scene.jsx");
-      const sceneCode = fs.readFileSync(scenePath, "utf-8");
-      view.webview.html = buildHTML(sceneCode);
+      const mediaRoot = vscode.Uri.joinPath(context.extensionUri, "media");
+      view.webview.options = {
+        enableScripts: true,
+        localResourceRoots: [mediaRoot],
+      };
+      view.webview.html = buildHTML(view.webview, mediaRoot);
 
       sendProjectInfo();
       detectAgents();
@@ -258,17 +259,22 @@ function activate(context) {
   });
 }
 
-function buildHTML(sceneJsx) {
-  let code = sceneJsx
-    .replace(/^import\s.*;\s*/gm, "")
-    .replace(/^export\s+default\s+/m, "const OMCScene = ");
+function buildHTML(webview, mediaRoot) {
+  // CSP-hardened webview: script comes from a local bundle shipped in
+  // extension media/, no CDN, no inline JS (nonce only allows the <script>
+  // tag we emit). Styles are inline so we tag them with the nonce too.
+  const bundleUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, "omc-webview.js"));
+  const nonce    = crypto.randomBytes(16).toString("base64");
+  const cspSrc   = webview.cspSource;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; img-src ${cspSrc} data:; style-src ${cspSrc} 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+  <style nonce="${nonce}">
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { background: transparent; overflow: hidden; pointer-events: none; }
     #root { width: 100%; pointer-events: none; }
@@ -279,18 +285,7 @@ function buildHTML(sceneJsx) {
 </head>
 <body>
   <div id="root"></div>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
-  <script type="text/babel">
-    const { useState, useEffect, useCallback, useRef } = React;
-
-    ${code}
-
-    ReactDOM.createRoot(document.getElementById("root")).render(
-      React.createElement(OMCScene)
-    );
-  <\/script>
+  <script nonce="${nonce}" src="${bundleUri}"><\/script>
 </body>
 </html>`;
 }

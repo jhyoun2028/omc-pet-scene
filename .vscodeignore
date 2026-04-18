@@ -1,6 +1,10 @@
 node_modules/**
+overlay-app/**
+dist/**
+public/**
 .vscode/**
 .playwright-mcp/**
+.omc/**
 .git/**
 *.png
 *.jpg
@@ -10,6 +14,8 @@ node_modules/**
 vite.config.js
 main.jsx
 index.html
+overlay.js
+omc-pet-scene.jsx
 plan.md
 CLAUDE.md
 package-lock.json

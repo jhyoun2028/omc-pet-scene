@@ -6,22 +6,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A pixel-art interactive scene showing Claude Code mascot figures sitting at desks. Switching OMC modes spawns/despawns specialized agent figures. Ships as both a **VS Code extension** (panel webview) and a **standalone Vite dev app**.
 
-## Three Runtime Modes
+## Runtime Architecture
 
-The same `omc-pet-scene.jsx` is loaded three different ways. When editing the scene, keep in mind that **all three hosts ingest the raw `.jsx` file via the same transform**: strip `^import ...;` lines, rewrite `^export default ` → `const OMCScene = `, then evaluate under Babel standalone + React 18 UMD from unpkg. New top-level imports or a different default-export shape will break the extension and Electron overlays silently.
+The scene lives in `omc-pet-scene.jsx`. Vite builds it (with React bundled in) into a single IIFE at `media/omc-webview.js`. Every runtime host loads that same built artifact — no CDN, no runtime Babel, no string-replace transform:
 
-1. **VS Code extension** (`extension.js`) — reads `omc-pet-scene.jsx`, applies the transform, injects into a webview view registered as panel `omcPet.view` (bottom bar, next to Terminal). Uses `retainContextWhenHidden: true`. Posts agent count + project info into the webview.
-2. **Standalone Vite dev** (`main.jsx` + `index.html` + `vite.config.js`) — ES module import, rendered full-screen over `#0a0a1a` body bg.
-3. **Electron overlay** — two copies exist: `overlay.js` (root, driven by `npm run overlay`) and `overlay-app/main.js` (standalone project with its own `package.json`). Both create a transparent, click-through, always-on-top window in the bottom-right of the primary display. The root `overlay.js` sets `focusable: false`; `overlay-app/` is a slightly older/smaller variant. If you touch overlay code, update both unless consolidating.
+1. **VS Code extension** (`extension.js`) — `resolveWebviewView` emits an HTML shell with a CSP (`script-src 'nonce-...'`, no `'unsafe-inline'`, no network origins) and a single `<script src>` pointing at `media/omc-webview.js` via `webview.asWebviewUri`. Panel view is `omcPet.view` (bottom bar), `retainContextWhenHidden: true`. `localResourceRoots` is clamped to `media/`.
+2. **Standalone Vite dev** (`main.jsx` + `index.html` + `vite.config.js`) — plain ES-module dev, `npm run dev`. Source-of-truth for iterating the scene.
+3. **Electron overlay** (`overlay.js`, driven by `npm run overlay`) — transparent, click-through, always-on-top window in the bottom-right. Loads `media/omc-overlay.html` which `<script src>`-loads `media/omc-webview.js`. The old standalone `overlay-app/` subproject is not wired to the new bundle; it's vestigial — either remove it or rewire its `main.js` to `loadFile("../media/omc-overlay.html")`.
+
+`vite.config.js` uses `publicDir: "public"` so `public/omc-overlay.html` is copied verbatim into `media/` on every build. `emptyOutDir` is on, so anything hand-written into `media/` will be wiped — author shell HTML under `public/`.
 
 ## Development
 
 No lint or test pipeline. No TypeScript.
 
 - **Standalone dev server:** `npm run dev` (Vite)
-- **Electron overlay:** `npm run overlay` (requires `electron` devDep, already installed)
-- **Extension testing:** open this folder in VS Code → Run & Debug (F5) → the "Pets" panel appears in the bottom bar
-- **Package extension:** `npx @vscode/vsce package` produces a `.vsix`. `.vscodeignore` controls what ships; the repo has many throwaway PNG iteration artifacts at the root, so verify the `.vsix` payload before publishing.
+- **Build webview bundle:** `npm run build` (required before loading the VS Code extension or the Electron overlay — they both load `media/omc-webview.js`)
+- **Electron overlay:** `npm run build && npm run overlay`
+- **Extension testing:** `npm run build` first, then open this folder in VS Code → Run & Debug (F5) → the "Pets" panel appears in the bottom bar
+- **Package extension:** `npm run package` (alias for `vite build && vsce package`). `.vscodeignore` excludes the 100MB of PNG iteration artifacts at the root as well as `omc-pet-scene.jsx` (the source — the shipped `.vsix` only needs `extension.js` + `media/**` + `package.json`).
 
 ## Hard Constraints
 
@@ -35,7 +38,7 @@ No lint or test pipeline. No TypeScript.
 
 ## Architecture
 
-**Files:** `omc-pet-scene.jsx` is the scene (all components, inline styles, ~700 lines). `extension.js` is the VS Code extension host that wraps it in a webview. `main.jsx` + `index.html` + `vite.config.js` are the standalone dev harness. `overlay.js` and `overlay-app/main.js` are Electron hosts.
+**Files:** `omc-pet-scene.jsx` is the scene (all components, inline styles, ~800 lines). `extension.js` is the VS Code extension host; it emits a CSP-locked webview HTML shell and points it at `media/omc-webview.js` via `asWebviewUri`. `main.jsx` + `index.html` + `vite.config.js` are the standalone dev harness. `overlay.js` loads `media/omc-overlay.html` via `loadFile`. The build output `media/omc-webview.js` is the runtime bundle (React inlined); `public/omc-overlay.html` is the overlay shell source (Vite copies it to `media/` on build).
 
 **Extension ↔ Scene messaging:** `extension.js` posts three message types to the webview; the scene listens via `window.addEventListener("message", ...)`:
 - `{ type: "setMode", modeIdx }` — switch mode button (keeps mode-based agent count)
