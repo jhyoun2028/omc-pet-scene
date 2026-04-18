@@ -502,6 +502,8 @@ export default function OMCScene() {
   const [entryTicks,   setEntryTicks]   = useState({ 0: 0 });
   const [projectName,  setProjectName]  = useState("");
   const [projectTasks, setProjectTasks] = useState([]);
+  const [scale,        setScale]        = useState(1);    // 0.5 – 1.5 in 0.25 steps
+  const [hidden,       setHidden]       = useState(false);
 
   const mode         = MODES[modeIdx];
   // agentCount from extension overrides mode-based count
@@ -604,17 +606,93 @@ export default function OMCScene() {
   }, [effectiveCount, tick]);
 
   const rows = getLayout(activeAgents);
+  // Shrink the SVG to the actual content so the host window / panel doesn't
+  // stretch a giant transparent box over the user's clickable UI.
+  const vbHeight = rows.length === 1 ? 180 : 290;
+
+  // Shared chrome-button styling — small, pixel-terminal aesthetic.
+  const btnStyle = {
+    pointerEvents: "auto",
+    width: 22,
+    height: 22,
+    padding: 0,
+    fontFamily: "monospace",
+    fontSize: 13,
+    lineHeight: "20px",
+    color: "#C47050",
+    background: "#12121e",
+    border: "1px solid #2a2a44",
+    borderRadius: 4,
+    cursor: "pointer",
+  };
+
+  if (hidden) {
+    return (
+      <div style={{
+        background: "transparent",
+        pointerEvents: "none",
+        display: "flex",
+        justifyContent: "flex-end",
+        padding: 4,
+      }}>
+        <button
+          onClick={() => setHidden(false)}
+          title="Show pets"
+          style={{ ...btnStyle, width: "auto", padding: "0 8px" }}
+        >
+          ▲ pets
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{
       background: "transparent",
       overflow: "hidden",
-      maxWidth: 800,
-      margin: "0 auto",
       fontFamily: "monospace",
       pointerEvents: "none",
+      width: "100%",
+      lineHeight: 0,
+      position: "relative",
     }}>
-      <svg viewBox="0 0 700 300" width="100%" style={{ display: "block", pointerEvents: "none" }}>
+      {/* Corner controls: size − / + / hide. Opt back in to pointer events so
+          only these tiny buttons capture clicks; the rest of the scene stays
+          fully click-through. */}
+      <div style={{
+        position: "absolute",
+        top: 4,
+        right: 4,
+        display: "flex",
+        gap: 3,
+        pointerEvents: "none",
+        zIndex: 10,
+      }}>
+        <button
+          onClick={() => setScale((s) => Math.max(0.5, +(s - 0.25).toFixed(2)))}
+          disabled={scale <= 0.5}
+          title="Smaller"
+          style={btnStyle}
+        >−</button>
+        <button
+          onClick={() => setScale((s) => Math.min(1.5, +(s + 0.25).toFixed(2)))}
+          disabled={scale >= 1.5}
+          title="Larger"
+          style={btnStyle}
+        >+</button>
+        <button
+          onClick={() => setHidden(true)}
+          title="Hide"
+          style={btnStyle}
+        >×</button>
+      </div>
+
+      <svg
+        viewBox={`0 0 700 ${vbHeight}`}
+        width={`${Math.round(scale * 100)}%`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ display: "block", pointerEvents: "none", margin: "0 auto" }}
+      >
 
         {/* No background — transparent overlay */}
 

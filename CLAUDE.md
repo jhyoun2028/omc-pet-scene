@@ -49,7 +49,9 @@ No lint or test pipeline. No TypeScript.
 
 **SVG coordinate system:** `viewBox="0 0 700 400"`. Figures ~40px wide. Desk at y=280. HUD at y=0. Task bubbles at y=80-100.
 
-**State:** `tick` (frame counter), `modeIdx` (active mode), `agentCount` (explicit override from extension, `null` means "use mode count"), `agentTasks` (agent index to task string), `sparkles` (active particles), `projectName`. Effective agent count is `agentCount ?? modes[modeIdx].count` — the extension and the mode buttons can disagree, and the extension wins until the user clicks a mode button (which resets `agentCount` to `null`).
+**State:** `tick` (frame counter), `modeIdx` (active mode), `agentCount` (explicit override from extension, `null` means "use mode count"), `agentTasks` (agent index to task string), `sparkles` (active particles), `projectName`, `projectTasks` (live from extension), `scale` (user zoom 0.5–1.5, 0.25 steps), `hidden` (hide toggle). Effective agent count is `agentCount ?? modes[modeIdx].count` — the extension and the mode buttons can disagree, and the extension wins until the user clicks a mode button (which resets `agentCount` to `null`).
+
+**Click-through discipline:** the scene is designed to be visually overlaid on a host UI (VS Code panel, Electron overlay) without stealing clicks. Every wrapping element explicitly sets `pointer-events: none` (html, body, #root, wrapper div, `<svg>`). **Only** `<button>` elements (the corner size/hide controls) opt back in via `pointer-events: auto`. If you add new interactive elements, set `pointerEvents: "auto"` inline — otherwise they will be silently un-clickable. The SVG's `viewBox` height shrinks from 290 → 180 when only one desk row is active so the transparent bounding box doesn't stretch over the host UI.
 
 ## Visual Style
 

@@ -43,9 +43,24 @@ function activate(context) {
   );
 
   // ── Agent Detection ────────────────────────────────────────
-  function detectAgents() {
+  function countClaudeProcesses() {
+    return new Promise((resolve) => {
+      // Count actual claude/anthropic agent processes running on the system
+      exec(
+        "ps aux | grep -iE '(claude|anthropic|subagent|ccagent)' | grep -v grep | wc -l",
+        { timeout: 2000 },
+        (err, stdout) => {
+          if (err) return resolve(0);
+          resolve(parseInt(stdout.trim(), 10) || 0);
+        }
+      );
+    });
+  }
+
+  async function detectAgents() {
     if (!webviewView) return;
 
+    // Count Claude-related terminals in VS Code
     const claudeTerminals = vscode.window.terminals.filter((t) => {
       const name = (t.name || "").toLowerCase();
       return (
@@ -55,17 +70,19 @@ function activate(context) {
       );
     });
 
+    // Count actual system processes
+    const processCount = await countClaudeProcesses();
+
     const now = Date.now();
     recentEdits = recentEdits.filter((t) => now - t < 5000);
     const editVelocity = recentEdits.length;
-    const terminalCount = claudeTerminals.length;
 
-    // Base: 1 agent (autopilot always present)
-    // Each Claude terminal adds an agent; high edit velocity adds more
-    let detected = 1 + terminalCount;
-    if (editVelocity >= 8) detected = Math.max(detected, 6);
-    else if (editVelocity >= 5) detected = Math.max(detected, 4);
-    else if (editVelocity >= 3) detected = Math.max(detected, 2);
+    // Use the higher of: terminal count, process count (capped at 8 since 1 is always the main)
+    const externalAgents = Math.max(claudeTerminals.length, Math.min(processCount, 8));
+    // Always at least 1 (main autopilot) + detected sub-agents
+    let detected = Math.max(1, externalAgents);
+    // Edit velocity can bump it up slightly (active coding = more workers)
+    if (editVelocity >= 8) detected = Math.max(detected, detected + 1);
     detected = Math.min(detected, 9); // cap at roster size
 
     if (detected !== agentCount) {
@@ -138,17 +155,13 @@ function activate(context) {
       }
     } catch (e) {}
 
-    for (const t of vscode.window.terminals.slice(0, 4)) {
-      const name = (t.name || "").toLowerCase();
-      if (name.includes("claude") || name.includes("agent")) {
-        tasks.push(`agent: ${t.name}...`);
-      }
-    }
-
-    // Include terminal names as task context
-    for (const t of vscode.window.terminals.slice(0, 6)) {
+    for (const t of vscode.window.terminals.slice(0, 9)) {
       const name = (t.name || "").trim();
-      if (name) tasks.push(`running ${name}...`);
+      if (!name) continue;
+      const lower = name.toLowerCase();
+      if (lower.includes("claude") || lower.includes("agent") || lower.includes("subagent") || lower.includes("executor")) {
+        tasks.push(`${name}...`);
+      }
     }
 
     if (tasks.length < 4) {
@@ -198,8 +211,11 @@ function buildHTML(sceneJsx) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #08080e; overflow: hidden; }
-    #root { width: 100%; }
+    html, body { background: transparent; overflow: hidden; pointer-events: none; }
+    #root { width: 100%; pointer-events: none; }
+    #root svg { pointer-events: none; }
+    /* Only the tiny corner controls opt back in. */
+    #root button { pointer-events: auto; }
   </style>
 </head>
 <body>
