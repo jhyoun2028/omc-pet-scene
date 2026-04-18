@@ -224,7 +224,7 @@ function buildHTML(sceneJsx) {
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
   <script type="text/babel">
-    const { useState, useEffect, useCallback } = React;
+    const { useState, useEffect, useCallback, useRef } = React;
 
     ${code}
 

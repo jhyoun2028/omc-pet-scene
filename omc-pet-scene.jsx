@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // ── Agent Roster ──────────────────────────────────────────────
 const AGENTS = [
@@ -510,8 +510,33 @@ export default function OMCScene() {
   const effectiveCount = agentCount !== null ? agentCount : mode.count;
   const activeAgents = AGENTS.slice(0, Math.min(effectiveCount, AGENTS.length));
 
-  // VS Code message listener — receives project info and auto-sets agent count
+  // Refs mirror committed state so the message listener can read fresh
+  // values without re-subscribing every render. Needed because the extension
+  // can burst `setAgentCount` + `setMode` back-to-back (3s poll + edit
+  // watchers): with the old `[modeIdx, tick, effectiveCount]` deps, the
+  // second message in a burst read a stale closure and anchored the entry
+  // tick range to pre-batch values, dropping walk-in animations.
+  const tickRef           = useRef(tick);
+  const modeIdxRef        = useRef(modeIdx);
+  const effectiveCountRef = useRef(effectiveCount);
+  useEffect(() => { tickRef.current           = tick;           }, [tick]);
+  useEffect(() => { modeIdxRef.current        = modeIdx;        }, [modeIdx]);
+  useEffect(() => { effectiveCountRef.current = effectiveCount; }, [effectiveCount]);
+
+  // VS Code message listener — receives project info and auto-sets agent count.
+  // Subscribed once ([] deps); reads refs for state that can change between
+  // messages in the same tick.
   useEffect(() => {
+    function spawnEntryTicks(prevCount, newCount) {
+      if (newCount <= prevCount) return;
+      const t = tickRef.current;
+      setEntryTicks((prev) => {
+        const next = { ...prev };
+        for (let i = prevCount; i < newCount; i++) next[i] = t;
+        return next;
+      });
+    }
+
     function handleMessage(event) {
       const msg = event.data;
       if (msg.type === "projectTasks") {
@@ -519,38 +544,29 @@ export default function OMCScene() {
       }
       if (msg.type === "projectName")  setProjectName(msg.name);
       if (msg.type === "setAgentCount" && typeof msg.count === "number") {
-        const newCount = Math.max(1, Math.min(msg.count, AGENTS.length));
-        const prevCount = effectiveCount;
+        const newCount  = Math.max(1, Math.min(msg.count, AGENTS.length));
+        const prevCount = effectiveCountRef.current;
+        effectiveCountRef.current = newCount; // keep fresh for next message in burst
         setAgentCount(newCount);
-        if (newCount > prevCount) {
-          setEntryTicks((prev) => {
-            const next = { ...prev };
-            for (let i = prevCount; i < newCount; i++) next[i] = tick;
-            return next;
-          });
-        }
+        spawnEntryTicks(prevCount, newCount);
       }
       // Legacy mode support
       if (msg.type === "setMode" && typeof msg.modeIdx === "number") {
         const idx = Math.max(0, Math.min(msg.modeIdx, MODES.length - 1));
-        if (idx !== modeIdx) {
-          const prevCount = effectiveCount;
-          const newCount = MODES[idx].count;
+        if (idx !== modeIdxRef.current) {
+          const prevCount = effectiveCountRef.current;
+          const newCount  = MODES[idx].count;
+          modeIdxRef.current        = idx;
+          effectiveCountRef.current = newCount;
           setModeIdx(idx);
           setAgentCount(null); // revert to mode-based
-          if (newCount > prevCount) {
-            setEntryTicks((prev) => {
-              const next = { ...prev };
-              for (let i = prevCount; i < newCount; i++) next[i] = tick;
-              return next;
-            });
-          }
+          spawnEntryTicks(prevCount, newCount);
         }
       }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [modeIdx, tick, effectiveCount]);
+  }, []);
 
   // Tick loop
   useEffect(() => {
@@ -569,6 +585,12 @@ export default function OMCScene() {
       next[i] = getRoleTask(agent.name, i, tick, projectTasks);
     });
     setAgentTasks(next);
+    // `tick` is intentionally omitted: `tickBucket` drives the 3s cadence,
+    // and depending on `tick` directly would fire this effect every 100ms.
+    // `activeAgents` (the array ref) is also excluded; only its .length
+    // matters for this effect, and agent ordering is fixed (sliced from the
+    // same AGENTS roster in index order), so a ref change without a length
+    // change cannot happen today.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickBucket, activeAgents.length, projectTasks]);
 
