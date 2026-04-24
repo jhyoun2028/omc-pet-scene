@@ -271,6 +271,36 @@ function TaskBubble({ cx, y, text, color, tick }) {
   );
 }
 
+// ── Accessory (per-agent hats / clothing) ────────────────────
+// Strictly additive pixel art rendered on top of (or above) the Clawd body.
+// The mascot's own rects are never modified — this function only adds.
+// cx/by/bw are the body origin; s is the global mascot scale (0.75).
+function Accessory({ agentName, cx, by, bw, s, tick, index }) {
+  if (agentName === "Autopilot") {
+    // Golden crown sitting on top of the head, slight bob with idle rhythm.
+    const bob = Math.sin(tick * 0.09 + index * 1.2) * 0.4;
+    const baseY = by - 4 + bob;
+    const peakBase = baseY - 2;
+    return (
+      <g>
+        {/* Base band */}
+        <rect x={cx - 15} y={baseY}     width={30} height={3} fill="#E8C060" />
+        <rect x={cx - 15} y={baseY}     width={30} height={1} fill="#FFE8A0" opacity={0.7} />
+        <rect x={cx - 15} y={baseY + 2} width={30} height={1} fill="#B8902E" opacity={0.6} />
+        {/* Three peaks */}
+        <rect x={cx - 13} y={peakBase - 4} width={4} height={6} fill="#E8C060" />
+        <rect x={cx - 2}  y={peakBase - 6} width={4} height={8} fill="#E8C060" />
+        <rect x={cx + 9}  y={peakBase - 4} width={4} height={6} fill="#E8C060" />
+        {/* Gems on peaks */}
+        <rect x={cx - 12} y={peakBase - 2} width={2} height={2} fill="#CF5050" />
+        <rect x={cx - 1}  y={peakBase - 4} width={2} height={2} fill="#4A7FBF" />
+        <rect x={cx + 10} y={peakBase - 2} width={2} height={2} fill="#5BA55B" />
+      </g>
+    );
+  }
+  return null;
+}
+
 // ── Clawd Mascot (front-facing, s=0.35) ──────────────────────
 // SHAPE IS LOCKED. Only scale changed to 0.35.
 function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
@@ -407,6 +437,15 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
       <rect x={bx + 19 * s} y={by + bh + legYL2} width={lw} height={lh} fill={acc} />
       <rect x={bx + 59 * s} y={by + bh + legYR1} width={lw} height={lh} fill={acc} />
       <rect x={bx + 73 * s} y={by + bh + legYR2} width={lw} height={lh} fill={acc} />
+
+      {/* ACCESSORY (role-specific hat / clothing; never modifies mascot shape) */}
+      {isSeated && (
+        <Accessory
+          agentName={agent.name}
+          cx={currentCX} by={by} bw={bw} s={s}
+          tick={tick} index={index}
+        />
+      )}
 
       {/* Name tag (only when seated) */}
       {isSeated && (
