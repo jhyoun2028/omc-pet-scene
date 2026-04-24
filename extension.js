@@ -171,7 +171,12 @@ function activate(context) {
 
     const active = vscode.window.activeTextEditor;
     if (active && active.document.uri.scheme === "file") {
-      tasks.push(`focused on ${path.basename(active.document.fileName)}...`);
+      const name = path.basename(active.document.fileName);
+      // Include the cursor line so the bubble reflects *where* the user is
+      // in the file, not just which file is open. 1-based to match the
+      // status bar / go-to-line UI.
+      const line = active.selection.active.line + 1;
+      tasks.push(`focused on ${name}:${line}...`);
     }
 
     for (const d of vscode.workspace.textDocuments.filter((d) => d.isDirty && d.uri.scheme === "file")) {
@@ -240,6 +245,7 @@ function activate(context) {
     }),
     vscode.workspace.onDidSaveTextDocument((doc) => { trackSave(doc); scheduleSend(); }),
     vscode.window.onDidChangeActiveTextEditor((ed) => { trackOpen(ed); scheduleSend(); }),
+    vscode.window.onDidChangeTextEditorSelection(() => scheduleSend()),
     vscode.window.onDidOpenTerminal(() => scheduleDetect()),
     vscode.window.onDidCloseTerminal(() => setTimeout(scheduleDetect, 500)),
     vscode.workspace.onDidCreateFiles(() => { scheduleSend(); scheduleDetect(); }),
