@@ -423,13 +423,14 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
 }
 
 // ── HUD Bar ───────────────────────────────────────────────────
-// Layout adapts to `width` (the SVG viewBox width). Left-side segments
-// (project name, mode, agents) start from x=14 with separators; right-side
-// segments (tokens, Clauding) are right-anchored to `width - 14`.
+// Layout adapts to `width` (the SVG viewBox width). In compact mode
+// (<560px, e.g. /autopilot or /deepwork) the agents-count and tokens
+// segments are dropped so the mode label doesn't collide with "Clauding".
 function HUD({ mode, agentCount, tick, projectName, width }) {
   const dotCount = Math.floor(tick / 3) % 4;
   const dots     = ".".repeat(dotCount);
   const tokenK   = 124 + (Math.floor(tick * 0.28) % 200);
+  const compact  = width < 560;
   return (
     <g>
       <rect x={0} y={0}  width={width} height={44} fill="#080810" />
@@ -442,16 +443,20 @@ function HUD({ mode, agentCount, tick, projectName, width }) {
       <rect x={210} y={10} width={1}  height={24} fill="#1a1a30" />
       <text x={224} y={30} fill="#666" fontSize="14" fontFamily="monospace">{mode}</text>
 
-      <rect x={340} y={10} width={1}  height={24} fill="#1a1a30" />
-      <text x={354} y={30} fill="#666" fontSize="14" fontFamily="monospace">agents: {agentCount}</text>
+      {!compact && (
+        <>
+          <rect x={340} y={10} width={1}  height={24} fill="#1a1a30" />
+          <text x={354} y={30} fill="#666" fontSize="14" fontFamily="monospace">agents: {agentCount}</text>
+          <rect x={width - 110} y={10} width={1} height={24} fill="#1a1a30" />
+          <text x={width - 120} y={30} textAnchor="end"
+            fill="#666" fontSize="14" fontFamily="monospace">{tokenK}k tokens</text>
+        </>
+      )}
 
       <text x={width - 14} y={30} textAnchor="end"
         fill="#5BA55B" fontSize="14" fontFamily="monospace">
         Clauding{dots}
       </text>
-      <rect x={width - 110} y={10} width={1} height={24} fill="#1a1a30" />
-      <text x={width - 120} y={30} textAnchor="end"
-        fill="#666" fontSize="14" fontFamily="monospace">{tokenK}k tokens</text>
     </g>
   );
 }
