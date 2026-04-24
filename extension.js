@@ -127,7 +127,24 @@ function activate(context) {
   // untracked files, which `git diff HEAD` misses — matters here because a
   // lot of work in this repo is untracked assets.
   let gitChangesCache = { files: [], at: 0 };
+  let gitBranchCache  = { branch: "",  at: 0 };
   const GIT_CACHE_MS = 4000;
+
+  async function getGitBranch() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders) return "";
+    const now = Date.now();
+    if (now - gitBranchCache.at < GIT_CACHE_MS) return gitBranchCache.branch;
+    return new Promise((resolve) => {
+      exec("git rev-parse --abbrev-ref HEAD 2>/dev/null",
+        { cwd: folders[0].uri.fsPath, timeout: 2000 },
+        (err, stdout) => {
+          const branch = err ? "" : stdout.trim();
+          gitBranchCache = { branch, at: Date.now() };
+          resolve(branch);
+        });
+    });
+  }
 
   async function getGitChanges() {
     const folders = vscode.workspace.workspaceFolders;
@@ -194,6 +211,11 @@ function activate(context) {
     try {
       for (const f of (await getGitChanges()).slice(0, 5)) {
         tasks.push(`changed ${f}...`);
+      }
+      const branch = await getGitBranch();
+      // Filter out HEAD (detached) and empty; keep short branch names only.
+      if (branch && branch !== "HEAD" && branch.length < 40) {
+        tasks.push(`on branch ${branch}...`);
       }
     } catch (e) {}
 
