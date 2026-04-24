@@ -33,15 +33,34 @@ const AGENT_ROLE_TASKS = {
   Validator:       ["testing {f}...", "verifying output...", "running checks...", "validating types...", "confirming fix..."],
 };
 
+// Infer which agent role is best-suited to a task string based on its verb.
+// Returns an agent name or null if the verb doesn't map cleanly.
+function inferRoleFromTask(taskStr) {
+  const s = taskStr.toLowerCase();
+  if (s.startsWith("focused on"))  return "Autopilot";
+  if (s.startsWith("on branch"))   return "Autopilot";
+  if (s.startsWith("editing"))     return "Worker";
+  if (s.startsWith("changed"))     return "Worker";
+  if (s.startsWith("saved"))       return "Validator";
+  if (s.startsWith("reviewing"))   return "Critic";
+  return null;
+}
+
 function getRoleTask(agentName, index, tick, projectTasks) {
-  // If the extension sent real task strings, assign them to agents in order
-  // (extension.js already orders them by recency/relevance). Slowly rotate
-  // when there are more tasks than agents so everyone gets a turn.
   if (projectTasks && projectTasks.length > 0) {
+    // Prefer a task whose verb matches this agent's role — Worker says
+    // "editing foo.js…", Critic says "reviewing…", etc. Keeps the bubbles
+    // feeling like the right specialist is actually doing the right thing.
+    const byRole = projectTasks.filter((t) => inferRoleFromTask(t) === agentName);
+    if (byRole.length > 0) {
+      const offset = Math.floor(tick / 80);
+      return byRole[offset % byRole.length];
+    }
+    // Fallback: round-robin over any real task so no agent goes silent.
     const offset = Math.floor(tick / 80);
     return projectTasks[(index + offset) % projectTasks.length];
   }
-  // Fallback: role-specific templates
+  // No extension data — role-specific templates.
   const pool = AGENT_ROLE_TASKS[agentName] || AGENT_ROLE_TASKS.Worker;
   const template = pool[(Math.floor(tick / 50) + index) % pool.length];
   return template.replace(" {f}", "");
