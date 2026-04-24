@@ -352,6 +352,78 @@ function Accessory({ agentName, cx, by, bw, s, tick, index }) {
     );
   }
 
+  if (agentName === "Critic") {
+    // Small red bow tie on the chest (below the eyes, on the body).
+    const cy = by + 36 * s;
+    return (
+      <g>
+        {/* Left wing (trapezoid approximated with stacked rects) */}
+        <rect x={cx - 7} y={cy}     width={4} height={3} fill="#A33E3E" />
+        <rect x={cx - 6} y={cy - 1} width={3} height={1} fill="#A33E3E" />
+        <rect x={cx - 6} y={cy + 3} width={3} height={1} fill="#A33E3E" />
+        {/* Right wing */}
+        <rect x={cx + 3} y={cy}     width={4} height={3} fill="#A33E3E" />
+        <rect x={cx + 3} y={cy - 1} width={3} height={1} fill="#A33E3E" />
+        <rect x={cx + 3} y={cy + 3} width={3} height={1} fill="#A33E3E" />
+        {/* Knot */}
+        <rect x={cx - 1} y={cy - 1} width={2} height={5} fill="#7A2626" />
+        <rect x={cx - 1} y={cy}     width={2} height={1} fill="#CF5050" opacity={0.7} />
+      </g>
+    );
+  }
+
+  if (agentName === "Validator") {
+    // Round green badge with a white checkmark on the chest.
+    const cy = by + 32 * s;
+    return (
+      <g>
+        {/* Badge body (pixel 'circle': center block + side blocks) */}
+        <rect x={cx - 3} y={cy - 3} width={6} height={6} fill="#0F6B3E" />
+        <rect x={cx - 4} y={cy - 2} width={8} height={4} fill="#0F6B3E" />
+        <rect x={cx - 3} y={cy - 3} width={6} height={1} fill="#4FC080" opacity={0.8} />
+        {/* Checkmark */}
+        <rect x={cx - 2} y={cy}     width={1} height={2} fill="#fff" />
+        <rect x={cx - 1} y={cy + 1} width={1} height={1} fill="#fff" />
+        <rect x={cx}     y={cy}     width={1} height={1} fill="#fff" />
+        <rect x={cx + 1} y={cy - 1} width={1} height={1} fill="#fff" />
+      </g>
+    );
+  }
+
+  if (agentName === "Explorer") {
+    // Safari hat: wide brim + rounded dome in tan/olive.
+    const bob = Math.sin(tick * 0.09 + index * 1.2) * 0.4;
+    const brimY = by - 2 + bob;
+    return (
+      <g>
+        {/* Brim (wider than the head) */}
+        <rect x={cx - 16} y={brimY}     width={32} height={2} fill="#7A6438" />
+        <rect x={cx - 16} y={brimY + 1} width={32} height={1} fill="#000" opacity={0.3} />
+        {/* Dome */}
+        <rect x={cx - 8}  y={brimY - 5} width={16} height={5} fill="#8A7244" />
+        <rect x={cx - 8}  y={brimY - 5} width={16} height={1} fill="#A88A5A" opacity={0.6} />
+        {/* Hat band */}
+        <rect x={cx - 8}  y={brimY - 2} width={16} height={1} fill="#4a3020" />
+      </g>
+    );
+  }
+
+  if (agentName === "Risk Assessor") {
+    // Hi-vis safety vest: two vertical stripes down the body front.
+    return (
+      <g>
+        {/* Left vertical stripe */}
+        <rect x={cx - 10} y={by + 24 * s} width={5} height={18 * s} fill="#E8B100" opacity={0.88} />
+        <rect x={cx - 10} y={by + 24 * s} width={1} height={18 * s} fill="#FFE27A" opacity={0.7} />
+        {/* Right vertical stripe */}
+        <rect x={cx + 5}  y={by + 24 * s} width={5} height={18 * s} fill="#E8B100" opacity={0.88} />
+        <rect x={cx + 9}  y={by + 24 * s} width={1} height={18 * s} fill="#FFE27A" opacity={0.7} />
+        {/* Reflective horizontal band */}
+        <rect x={cx - 10} y={by + 34 * s} width={20} height={1} fill="#E8E8F0" opacity={0.85} />
+      </g>
+    );
+  }
+
   if (agentName === "Autopilot") {
     // Golden crown sitting on top of the head, slight bob with idle rhythm.
     const bob = Math.sin(tick * 0.09 + index * 1.2) * 0.4;
