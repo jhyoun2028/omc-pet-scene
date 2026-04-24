@@ -304,6 +304,54 @@ function Accessory({ agentName, cx, by, bw, s, tick, index }) {
     return <Hardhat shell="#E8B100" stripe="#1a1a2a" highlight="#FFE27A" />;
   }
 
+  if (agentName === "Librarian") {
+    // Mortarboard (graduation cap): flat square board + band + swinging tassel.
+    const bob = Math.sin(tick * 0.09 + index * 1.2) * 0.4;
+    const bandY = by - 4 + bob;
+    const tasselSwing = Math.sin(tick * 0.14 + index) * 1.5;
+    return (
+      <g>
+        {/* Cap band */}
+        <rect x={cx - 9}  y={bandY}     width={18} height={3} fill="#1a1a2a" />
+        <rect x={cx - 9}  y={bandY}     width={18} height={1} fill="#3a3a4a" opacity={0.7} />
+        {/* Flat board */}
+        <rect x={cx - 13} y={bandY - 2} width={26} height={2} fill="#1a1a2a" />
+        <rect x={cx - 13} y={bandY - 2} width={26} height={1} fill="#2a2a3a" opacity={0.8} />
+        {/* Button at center */}
+        <rect x={cx - 1}  y={bandY - 3} width={2} height={2} fill="#C47050" />
+        {/* Tassel: vertical string + fluffy end, swings with idle */}
+        <rect x={cx + 12 + tasselSwing} y={bandY - 1} width={1} height={6} fill="#E8C060" />
+        <rect x={cx + 11 + tasselSwing} y={bandY + 5} width={3} height={2} fill="#E8C060" />
+      </g>
+    );
+  }
+
+  if (agentName === "Oracle") {
+    // Pointy wizard hat, five levels getting narrower, with a yellow star.
+    const bob = Math.sin(tick * 0.09 + index * 1.2) * 0.4;
+    const brimY = by - 3 + bob;
+    const twinkle = (Math.floor(tick / 10) + index) % 6 === 0 ? 1 : 0.85;
+    return (
+      <g>
+        {/* Brim */}
+        <rect x={cx - 12} y={brimY}     width={24} height={2} fill="#2a1f4a" />
+        <rect x={cx - 12} y={brimY + 1} width={24} height={1} fill="#000" opacity={0.35} />
+        {/* Cone levels */}
+        <rect x={cx - 7}  y={brimY - 3} width={14} height={3} fill="#3D2E70" />
+        <rect x={cx - 5}  y={brimY - 6} width={10} height={3} fill="#3D2E70" />
+        <rect x={cx - 3}  y={brimY - 9} width={6}  height={3} fill="#3D2E70" />
+        <rect x={cx - 1}  y={brimY - 11} width={2} height={2} fill="#3D2E70" />
+        {/* Highlight on left of cone */}
+        <rect x={cx - 7}  y={brimY - 3} width={1} height={3} fill="#6A4DA0" opacity={0.6} />
+        <rect x={cx - 5}  y={brimY - 6} width={1} height={3} fill="#6A4DA0" opacity={0.6} />
+        {/* Star on front */}
+        <rect x={cx - 1}  y={brimY - 4} width={2} height={1} fill="#E8C060" opacity={twinkle} />
+        <rect x={cx - 2}  y={brimY - 3} width={4} height={1} fill="#E8C060" opacity={twinkle} />
+        <rect x={cx - 1}  y={brimY - 2} width={2} height={1} fill="#E8C060" opacity={twinkle} />
+      </g>
+    );
+  }
+
   if (agentName === "Autopilot") {
     // Golden crown sitting on top of the head, slight bob with idle rhythm.
     const bob = Math.sin(tick * 0.09 + index * 1.2) * 0.4;
