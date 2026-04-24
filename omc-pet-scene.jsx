@@ -276,6 +276,34 @@ function TaskBubble({ cx, y, text, color, tick }) {
 // The mascot's own rects are never modified — this function only adds.
 // cx/by/bw are the body origin; s is the global mascot scale (0.75).
 function Accessory({ agentName, cx, by, bw, s, tick, index }) {
+  // Shared hardhat silhouette — dome + brim + ridge stripe. Color is
+  // the only thing that differs between Architect and Worker.
+  function Hardhat({ shell, stripe, highlight }) {
+    const bob = Math.sin(tick * 0.09 + index * 1.2) * 0.4;
+    const topY = by - 8 + bob;
+    return (
+      <g>
+        {/* Top cap */}
+        <rect x={cx - 6}  y={topY}     width={12} height={2} fill={shell} />
+        {/* Dome */}
+        <rect x={cx - 10} y={topY + 2} width={20} height={5} fill={shell} />
+        <rect x={cx - 10} y={topY + 2} width={20} height={1} fill={highlight} opacity={0.6} />
+        {/* Brim */}
+        <rect x={cx - 14} y={topY + 7} width={28} height={2} fill={shell} />
+        <rect x={cx - 14} y={topY + 8} width={28} height={1} fill="#000" opacity={0.25} />
+        {/* Ridge stripe */}
+        <rect x={cx - 10} y={topY + 4} width={20} height={1} fill={stripe} opacity={0.85} />
+      </g>
+    );
+  }
+
+  if (agentName === "Architect") {
+    return <Hardhat shell="#2A4D78" stripe="#FFFFFF" highlight="#6AA0DD" />;
+  }
+  if (agentName === "Worker") {
+    return <Hardhat shell="#E8B100" stripe="#1a1a2a" highlight="#FFE27A" />;
+  }
+
   if (agentName === "Autopilot") {
     // Golden crown sitting on top of the head, slight bob with idle rhythm.
     const bob = Math.sin(tick * 0.09 + index * 1.2) * 0.4;
