@@ -452,7 +452,12 @@ function Accessory({ agentName, cx, by, bw, s, tick, index }) {
 // ── Clawd Mascot (front-facing, s=0.35) ──────────────────────
 // SHAPE IS LOCKED. Only scale changed to 0.35.
 function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
-  const age = tick - entryTick;
+  // Stagger entries so a /team spawn doesn't have 9 agents walking in
+  // perfectly in sync. Each higher-index agent waits entryDelay ticks
+  // longer before starting to walk in.
+  const entryDelay = index * 3;
+  const rawAge     = tick - entryTick;
+  const age        = Math.max(0, rawAge - entryDelay);
 
   const walkDuration = 35;
   const sitDuration  = 8;
@@ -460,6 +465,9 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
   const isWalking = age < walkDuration;
   const isSitting = age >= walkDuration && age < walkDuration + sitDuration;
   const isSeated  = age >= walkDuration + sitDuration;
+  // Fully off-screen during the pre-entry delay — invisible until it's
+  // this agent's turn to walk in.
+  const isPending = rawAge < entryDelay;
 
   // Walk: ease-out from right side
   const walkProgress = Math.min(age / walkDuration, 1);
@@ -478,7 +486,12 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
   }
 
   // Idle bob (very subtle)
-  const idleBob = isSeated ? Math.sin(tick * 0.09 + index * 1.2) * 1.0 : 0;
+  // Give each agent its own idle frequency + amplitude so they don't
+  // all bob in perfect unison. Variation is small (±15%) so the scene
+  // still feels cohesive.
+  const idleFreq = 0.09 + ((index * 13) % 7) * 0.003;
+  const idleAmp  = 1.0  + ((index * 17) % 5) * 0.06;
+  const idleBob  = isSeated ? Math.sin(tick * idleFreq + index * 1.2) * idleAmp : 0;
 
   // Look-around: slight eye shift
   const lookPhase = (tick + index * 23) % 80;
@@ -531,6 +544,8 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
 
   const totalW = ew + bw + ew;
   const totalH = bh + lh;
+
+  if (isPending) return null;
 
   return (
     <g opacity={entryOpacity}>
@@ -629,14 +644,15 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
 }
 
 // ── HUD Bar ───────────────────────────────────────────────────
-// Layout adapts to `width` (the SVG viewBox width). In compact mode
-// (<560px, e.g. /autopilot or /deepwork) the agents-count and tokens
-// segments are dropped so the mode label doesn't collide with "Clauding".
-function HUD({ mode, agentCount, tick, projectName, width }) {
-  const dotCount = Math.floor(tick / 3) % 4;
-  const dots     = ".".repeat(dotCount);
-  const tokenK   = 124 + (Math.floor(tick * 0.28) % 200);
-  const compact  = width < 560;
+// Layout adapts to `width` (the SVG viewBox width). The agent count is
+// redundant with the visible mascots so we no longer draw it; the
+// tokens counter only renders at widths wide enough to clear the left
+// and right segments.
+function HUD({ mode, tick, projectName, width }) {
+  const dotCount  = Math.floor(tick / 3) % 4;
+  const dots      = ".".repeat(dotCount);
+  const tokenK    = 124 + (Math.floor(tick * 0.28) % 200);
+  const showTokens = width >= 520;
   return (
     <g>
       <rect x={0} y={0}  width={width} height={44} fill="#080810" />
@@ -649,12 +665,10 @@ function HUD({ mode, agentCount, tick, projectName, width }) {
       <rect x={210} y={10} width={1}  height={24} fill="#1a1a30" />
       <text x={224} y={30} fill="#666" fontSize="14" fontFamily="monospace">{mode}</text>
 
-      {!compact && (
+      {showTokens && (
         <>
-          <rect x={340} y={10} width={1}  height={24} fill="#1a1a30" />
-          <text x={354} y={30} fill="#666" fontSize="14" fontFamily="monospace">agents: {agentCount}</text>
-          <rect x={width - 110} y={10} width={1} height={24} fill="#1a1a30" />
-          <text x={width - 120} y={30} textAnchor="end"
+          <rect x={width - 200} y={10} width={1} height={24} fill="#1a1a30" />
+          <text x={width - 110} y={30} textAnchor="end"
             fill="#666" fontSize="14" fontFamily="monospace">{tokenK}k tokens</text>
         </>
       )}
@@ -949,7 +963,6 @@ export default function OMCScene() {
 
         <HUD
           mode={mode.label}
-          agentCount={activeAgents.length}
           tick={tick}
           projectName={projectName}
           width={vbWidth}
