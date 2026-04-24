@@ -423,14 +423,17 @@ function Clawd({ cx, targetY, agent, tick, index, entryTick }) {
 }
 
 // ── HUD Bar ───────────────────────────────────────────────────
-function HUD({ mode, agentCount, tick, projectName }) {
+// Layout adapts to `width` (the SVG viewBox width). Left-side segments
+// (project name, mode, agents) start from x=14 with separators; right-side
+// segments (tokens, Clauding) are right-anchored to `width - 14`.
+function HUD({ mode, agentCount, tick, projectName, width }) {
   const dotCount = Math.floor(tick / 3) % 4;
   const dots     = ".".repeat(dotCount);
   const tokenK   = 124 + (Math.floor(tick * 0.28) % 200);
   return (
     <g>
-      <rect x={0} y={0} width={700} height={44} fill="#080810" />
-      <rect x={0} y={43} width={700} height={1}  fill="#1a1a30" />
+      <rect x={0} y={0}  width={width} height={44} fill="#080810" />
+      <rect x={0} y={43} width={width} height={1}  fill="#1a1a30" />
 
       <text x={14} y={30} fill="#C47050" fontSize="16" fontFamily="monospace" fontWeight="bold">
         {projectName || "oh-my-claudecode"}
@@ -442,20 +445,25 @@ function HUD({ mode, agentCount, tick, projectName }) {
       <rect x={340} y={10} width={1}  height={24} fill="#1a1a30" />
       <text x={354} y={30} fill="#666" fontSize="14" fontFamily="monospace">agents: {agentCount}</text>
 
-      <rect x={490} y={10} width={1}  height={24} fill="#1a1a30" />
-      <text x={504} y={30} fill="#666" fontSize="14" fontFamily="monospace">{tokenK}k tokens</text>
-
-      <text x={620} y={30} fill="#5BA55B" fontSize="14" fontFamily="monospace">
+      <text x={width - 14} y={30} textAnchor="end"
+        fill="#5BA55B" fontSize="14" fontFamily="monospace">
         Clauding{dots}
       </text>
+      <rect x={width - 110} y={10} width={1} height={24} fill="#1a1a30" />
+      <text x={width - 120} y={30} textAnchor="end"
+        fill="#666" fontSize="14" fontFamily="monospace">{tokenK}k tokens</text>
     </g>
   );
 }
 
 // ── Grid layout helpers ────────────────────────────────────────
-// Returns rows: [{deskY, mascotY, stations: [{cx, color}]}]
+// Returns { rows, width } where rows is [{deskY, mascotY, stations, agentOffset}]
+// and width is the SVG viewBox width sized to hug the content. Minimum width
+// is MIN_VB_WIDTH so the HUD stays legible in /autopilot mode.
+const MIN_VB_WIDTH = 420;
 function getLayout(agents) {
   const SW = 110;
+  const SIDE_PAD = 22;
   const ROW1_DESK_Y   = 80;
   const ROW1_MASCOT_Y = 110;
   const ROW2_DESK_Y   = 190;
@@ -463,21 +471,29 @@ function getLayout(agents) {
 
   const count = agents.length;
 
+  const rowFor = (rowAgents) => rowAgents.length * SW + SIDE_PAD * 2;
+
   if (count <= 5) {
-    const totalW = count * SW;
-    const startX = (700 - totalW) / 2 + SW / 2;
+    const rowW   = rowFor(agents);
+    const width  = Math.max(rowW, MIN_VB_WIDTH);
+    const startX = (width - agents.length * SW) / 2 + SW / 2;
     const stations = agents.map((ag, i) => ({ cx: startX + i * SW, color: ag.color }));
-    return [{ deskY: ROW1_DESK_Y, mascotY: ROW1_MASCOT_Y, stations, agentOffset: 0 }];
-  } else {
-    // 6+ agents: split across two rows (top gets ceil, bottom gets rest)
-    const topCount = Math.min(5, Math.ceil(count / 2));
-    const top      = agents.slice(0, topCount);
-    const bottom   = agents.slice(topCount);
-    const topW     = top.length    * SW;
-    const botW     = bottom.length * SW;
-    const topStartX  = (700 - topW)  / 2 + SW / 2;
-    const botStartX  = (700 - botW)  / 2 + SW / 2;
-    return [
+    return {
+      width,
+      rows: [{ deskY: ROW1_DESK_Y, mascotY: ROW1_MASCOT_Y, stations, agentOffset: 0 }],
+    };
+  }
+
+  // 6+ agents: split across two rows (top gets ceil, bottom gets rest)
+  const topCount = Math.min(5, Math.ceil(count / 2));
+  const top      = agents.slice(0, topCount);
+  const bottom   = agents.slice(topCount);
+  const width    = Math.max(rowFor(top), rowFor(bottom), MIN_VB_WIDTH);
+  const topStartX = (width - top.length    * SW) / 2 + SW / 2;
+  const botStartX = (width - bottom.length * SW) / 2 + SW / 2;
+  return {
+    width,
+    rows: [
       {
         deskY: ROW1_DESK_Y, mascotY: ROW1_MASCOT_Y,
         stations: top.map((ag, i) => ({ cx: topStartX + i * SW, color: ag.color })),
@@ -488,8 +504,8 @@ function getLayout(agents) {
         stations: bottom.map((ag, i) => ({ cx: botStartX + i * SW, color: ag.color })),
         agentOffset: topCount,
       },
-    ];
-  }
+    ],
+  };
 }
 
 // ── Main Scene ────────────────────────────────────────────────
@@ -598,7 +614,7 @@ export default function OMCScene() {
   useEffect(() => {
     if (tick % 8 === 0 && activeAgents.length > 0) {
       const ai  = Math.floor(Math.random() * activeAgents.length);
-      const rows = getLayout(activeAgents);
+      const { rows } = getLayout(activeAgents);
       let rowIdx = 0, stationIdx = ai;
       if (rows.length > 1 && ai >= 5) { rowIdx = 1; stationIdx = ai - 5; }
       const row = rows[rowIdx];
@@ -627,7 +643,7 @@ export default function OMCScene() {
     }
   }, [effectiveCount, tick]);
 
-  const rows = getLayout(activeAgents);
+  const { rows, width: vbWidth } = getLayout(activeAgents);
   // Shrink the SVG to the actual content so the host window / panel doesn't
   // stretch a giant transparent box over the user's clickable UI.
   const vbHeight = rows.length === 1 ? 180 : 290;
@@ -707,12 +723,12 @@ export default function OMCScene() {
       </div>
 
       <svg
-        viewBox={`0 0 700 ${vbHeight}`}
+        viewBox={`0 0 ${vbWidth} ${vbHeight}`}
         preserveAspectRatio="xMidYMid meet"
         style={{
           display: "block",
           margin: "0 auto",
-          width: `${Math.round(scale * 700)}px`,
+          width: `${Math.round(scale * vbWidth)}px`,
           maxWidth: "100%",
           pointerEvents: "none",
         }}
@@ -725,6 +741,7 @@ export default function OMCScene() {
           agentCount={activeAgents.length}
           tick={tick}
           projectName={projectName}
+          width={vbWidth}
         />
 
         {/* Render each desk row */}
